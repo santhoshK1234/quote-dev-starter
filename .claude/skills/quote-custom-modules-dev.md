@@ -280,7 +280,7 @@ This runs `hs project upload`, which builds and auto-deploys to the HubSpot port
 
 ## Requirements & Constraints
 
-- Requires a Commerce Hub Professional or Enterprise account
+- Requires a Revenue Hub Professional or Enterprise account
 - Project name cannot be `cpq-theme`
 - Module `content_types` must include `QUOTE` and `QUOTE_BLUEPRINT`
 - Modules must be React (classic HubL modules are not supported)

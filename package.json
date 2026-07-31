@@ -1,6 +1,6 @@
 {
   "name": "quote-dev-starter",
-  "description": "Starter project for building custom-coded React modules for HubSpot Commerce Hub quote templates",
+  "description": "Starter project for building custom-coded React modules for HubSpot Revenue Hub quote templates",
   "private": true,
   "devDependencies": {
     "@hubspot/prettier-plugin-hubl": "^0.2.5",

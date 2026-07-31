@@ -1,6 +1,6 @@
 # quote-dev-starter
 
-A starter project for building **custom-coded React modules** for [HubSpot Commerce Hub](https://www.hubspot.com/products/commerce) quote templates.
+A starter project for building **custom-coded React modules** for [HubSpot Revenue Hub](https://www.hubspot.com/products/revenue) quote templates.
 
 This repo gives you a working example you can fork or copy: a typed React module that pulls quote and CRM data from HubL and hydrates an interactive island on the client.
 
@@ -8,9 +8,19 @@ This repo gives you a working example you can fork or copy: a typed React module
 
 ```
 src/cms-assets/my-react-assets/
-└── components/modules/QuoteExampleModule/
-    ├── index.tsx                       # Module entry: fields, hublDataTemplate, Component
-    └── islands/InteractiveButton.tsx   # Client-hydrated island
+└── components/modules/
+    ├── QuoteExampleModule/
+    │   ├── index.tsx                       # Module entry: fields, hublDataTemplate, Component
+    │   └── islands/InteractiveButton.tsx   # Client-hydrated island
+    ├── ConditionalTermsModule/
+    │   ├── index.tsx                       # Conditional sections based on line items
+    │   ├── fields.tsx                      # Editor fields (heading, intro, background color)
+    │   └── termsData.ts                   # Hardcoded clause text by section
+    └── RequiredAgreementModule/
+        ├── index.tsx                       # Module entry with editor detection
+        ├── fields.tsx                      # Editor fields (heading, terms, disabled reason)
+        ├── islands/TermsAcceptance.tsx     # useQuoteAcceptance hook + checkbox gating
+        └── TermsAcceptance.module.css      # Scoped styles
 ```
 
 The example module demonstrates:
