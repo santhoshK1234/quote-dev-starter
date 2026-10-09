@@ -141,8 +141,10 @@ interface HublData {
   agencyQuoteJson?: unknown; // agency_quote_master_data
   agencyDiscount?: CrmValue; // agency_discount (0.3 or 30 both mean 30%)
 
-  // Fallback amounts when agency_quote_master_data is empty
-  investment?: CrmValue; // total_commercial_rate (ex GST, before commission)
+  // actualMarketRate - discount - agency commission = investment
+  // investment + gstAmount = totalInvestment
+  actualMarketRate?: CrmValue; // total_bill_amount_before_discount_total_market_rate (before all discounts)
+  investment?: CrmValue; // total_commercial_rate (ex GST, after discount and agency commission)
   gstAmount?: CrmValue;
   totalInvestment?: CrmValue;
 
@@ -659,15 +661,17 @@ function monthlyBillingRows(agencyData: AgencyQuoteMasterData, sites: SiteRow[])
 }
 
 // Single row from the deal totals, when there's no agency quote data.
+// investment is after agency commission; commission is a % of the market rate.
 function dealBillingRows(
   investmentValue: CrmValue,
+  marketRate: number | null,
   rate: number,
   startMs: number | null,
   endMs: number | null,
 ): BillingRowCalc[] {
-  const investment = toAmount(investmentValue);
-  if (investment === null) return [];
-  const commission = investment * rate;
+  const net = toAmount(investmentValue);
+  if (net === null) return [];
+  const commission = marketRate !== null ? marketRate * rate : rate < 1 ? (net * rate) / (1 - rate) : 0;
 
   let flighting = "";
   if (startMs !== null && endMs !== null) {
@@ -679,7 +683,7 @@ function dealBillingRows(
   }
   const billFrom = endMs ?? startMs;
   return [
-    toBillingRow("deal", flighting, billFrom !== null ? billingDateFor(billFrom) : null, investment - commission, commission),
+    toBillingRow("deal", flighting, billFrom !== null ? billingDateFor(billFrom) : null, net, commission),
   ];
 }
 
@@ -731,17 +735,6 @@ function PageHead({ logoSrc, label }: { logoSrc: string; label: string }) {
     <div className="aosco-page-head">
       <img src={logoSrc} alt="AOSco" />
       <span className="aosco-page-head-ref">{label}</span>
-    </div>
-  );
-}
-
-function PageFoot({ text, page }: { text: string; page: number }) {
-  return (
-    <div className="aosco-page-foot">
-      <span>{text}</span>
-      <span>
-        Page <strong>{page}</strong>
-      </span>
     </div>
   );
 }
@@ -821,7 +814,7 @@ function SignField({ label, value }: { label: string; value?: string }) {
 }
 
 // ---------------------------------------------------------------------------
-// Campaign schedule grid (page 3)
+// Campaign schedule grid
 // ---------------------------------------------------------------------------
 
 function ScheduleGrid({ sites, weeks }: { sites: SiteRow[]; weeks: number[] }) {
@@ -916,31 +909,63 @@ function ScheduleGrid({ sites, weeks }: { sites: SiteRow[]; weeks: number[] }) {
   );
 }
 
-function PlacementsTable({ sites }: { sites: SiteRow[] }) {
+interface SiteAmounts {
+  market: number;
+  discount: number;
+  commission: number;
+  investment: number; // after discount and agency commission
+}
+
+// Site rows only carry the client rate and agency commission, so the market
+// rate is worked back from the deal-level discount % (same % on every site).
+function siteAmounts(s: SiteRow, discountRate: number): SiteAmounts {
+  const investment = round2(s.weeks.length * s.netPerWeek);
+  const commission = round2(s.weeks.length * s.commissionPerWeek);
+  const afterDiscount = investment + commission;
+  const market = round2(discountRate < 1 ? afterDiscount / (1 - discountRate) : afterDiscount);
+  return { market, discount: round2(market - afterDiscount), commission, investment };
+}
+
+function PlacementsTable({
+  sites,
+  discountRate,
+  discountLabel,
+  commissionLabel,
+}: {
+  sites: SiteRow[];
+  discountRate: number | null; // null = no market rate on the deal: discount columns hidden
+  discountLabel: string;
+  commissionLabel: string;
+}) {
   const paidWeeks = sites.filter((s) => !s.bonus).reduce((n, s) => n + s.weeks.length, 0);
   const bonusWeeks = sites.filter((s) => s.bonus).reduce((n, s) => n + s.weeks.length, 0);
-  const total = round2(
-    sites.reduce((n, s) => n + s.weeks.length * (s.netPerWeek + s.commissionPerWeek), 0),
-  );
+  const showDiscount = discountRate !== null;
+  const amounts = sites.map((s) => siteAmounts(s, discountRate ?? 0));
+  const sum = (pick: (a: SiteAmounts) => number) => round2(amounts.reduce((n, a) => n + pick(a), 0));
+  const dash = "\u2013";
 
   return (
-    <table className="aosco-table">
+    <table className="aosco-table aosco-table--compact">
       <thead>
         <tr>
-          <th style={{ width: "12%" }}>Site code</th>
+          <th style={{ width: "8%" }}>Site code</th>
           <th>Site</th>
-          <th style={{ width: "7%" }}>State</th>
-          <th style={{ width: "15%" }}>Format &amp; size</th>
-          <th style={{ width: "15%" }}>Week commencing</th>
-          <th className="mid" style={{ width: "8%" }}>Paid weeks</th>
-          <th className="mid" style={{ width: "8%" }}>Bonus weeks</th>
-          <th className="num" style={{ width: "12%" }}>Investment</th>
+          <th style={{ width: "5%" }}>State</th>
+          <th style={{ width: "10%" }}>Format &amp; size</th>
+          <th style={{ width: "14%" }}>Week commencing</th>
+          <th className="mid" style={{ width: "6%" }}>Paid weeks</th>
+          <th className="mid" style={{ width: "6%" }}>Bonus weeks</th>
+          {showDiscount && <th className="num" style={{ width: "9%" }}>Market rate</th>}
+          {showDiscount && <th className="num" style={{ width: "9%" }}>{discountLabel}</th>}
+          <th className="num" style={{ width: "9%" }}>{commissionLabel}</th>
+          <th className="num" style={{ width: "9%" }}>Investment</th>
         </tr>
       </thead>
       <tbody>
-        {sites.map((s) => {
+        {sites.map((s, i) => {
           const first = s.weeks[0];
           const last = s.weeks[s.weeks.length - 1];
+          const a = amounts[i];
           return (
             <tr key={s.key}>
               <td>{s.code || "\u2013"}</td>
@@ -958,10 +983,11 @@ function PlacementsTable({ sites }: { sites: SiteRow[] }) {
               <td className={cx("mid", s.bonus && "aosco-table-bonus")}>
                 {s.bonus ? `${s.weeks.length} (GTD)` : "\u2013"}
               </td>
+              {showDiscount && <td className="num">{s.bonus ? dash : money(a.market)}</td>}
+              {showDiscount && <td className="num">{s.bonus ? dash : negativeMoney(a.discount)}</td>}
+              <td className="num">{s.bonus ? dash : negativeMoney(a.commission)}</td>
               <td className={cx("num", s.bonus ? "aosco-table-bonus" : "strong")}>
-                {s.bonus
-                  ? "No charge"
-                  : money(round2(s.weeks.length * (s.netPerWeek + s.commissionPerWeek)))}
+                {s.bonus ? "No charge" : money(a.investment)}
               </td>
             </tr>
           );
@@ -974,7 +1000,10 @@ function PlacementsTable({ sites }: { sites: SiteRow[] }) {
           <td />
           <td className="mid">{paidWeeks}</td>
           <td className="mid">{bonusWeeks}</td>
-          <td className="num">{money(total)}</td>
+          {showDiscount && <td className="num">{money(sum((a) => a.market))}</td>}
+          {showDiscount && <td className="num">{negativeMoney(sum((a) => a.discount))}</td>}
+          <td className="num">{negativeMoney(sum((a) => a.commission))}</td>
+          <td className="num">{money(sum((a) => a.investment))}</td>
         </tr>
       </tbody>
     </table>
@@ -1128,16 +1157,42 @@ export function Component({ hublData }: Props) {
   // Money
   // -------------------------------------------------------------------------
   const configuredRate = toRate(h.agencyDiscount);
+  const marketRate = toAmount(h.actualMarketRate);
   const monthRows = monthlyBillingRows(agencyData, sites);
   const billingRows = monthRows.length
     ? monthRows
-    : dealBillingRows(h.investment, configuredRate ?? DEFAULT_COMMISSION_RATE, startMs, endMs);
+    : dealBillingRows(h.investment, marketRate, configuredRate ?? DEFAULT_COMMISSION_RATE, startMs, endMs);
   const totals = sumRows(billingRows);
+
+  // Both the discount and the agency commission are taken off the market rate:
+  //   actualMarketRate - discount - agency commission = investment
+  //   investment + GST = totalInvestment
+  // Deal amounts win; the billing rows fill any gaps.
+  const investment = toAmount(h.investment) ?? totals?.net ?? null;
+  const commission = totals?.commission ?? null;
+  const discount =
+    marketRate !== null && investment !== null
+      ? round2(Math.max(0, marketRate - investment - (commission ?? 0)))
+      : null;
+  const gstAmount = toAmount(h.gstAmount) ?? (investment !== null ? round2(investment * GST_RATE) : null);
+  const totalInvestment =
+    toAmount(h.totalInvestment) ?? (investment !== null && gstAmount !== null ? round2(investment + gstAmount) : null);
+  const discountRate = discount !== null && marketRate ? discount / marketRate : null;
+
+  // Agency % is deal.agency_discount, else commission / market rate. Never
+  // commission / (investment + commission): that ignores the other discount (10% -> 11.11%).
   const commissionRate =
     configuredRate ??
-    (totals && totals.investment > 0 ? totals.commission / totals.investment : DEFAULT_COMMISSION_RATE);
-  const rateLabel = formatRate(commissionRate);
+    (marketRate && commission !== null
+      ? commission / marketRate
+      : monthRows.length
+        ? null
+        : DEFAULT_COMMISSION_RATE);
+  const rateLabel = commissionRate !== null ? formatRate(commissionRate) : "";
+  const discountRateLabel = discountRate !== null ? formatRate(discountRate) : "";
   const agencyPrefix = agency.shortName || "Agency";
+  const commissionLabel = [`${agencyPrefix} commission`, rateLabel].filter(Boolean).join(" ");
+  const discountLabel = ["Discount", discountRateLabel].filter(Boolean).join(" ");
 
   const bonusNote = firstFilled(
     data.scheduleMeta?.bonusNote,
@@ -1164,13 +1219,12 @@ export function Component({ hublData }: Props) {
   );
 
   const headLabel = [documentTitle, referenceId].filter(Boolean).join(" \u00B7 ");
-  const footText = [companyLegalName, campaignName].filter(Boolean).join(" \u00B7 ");
 
   return (
     <div className="aosco-root">
       <style>{MODULE_CSS}</style>
 
-      {/* ================= Page 1 — cover ================= */}
+      {/* ================= cover ================= */}
       <section className="aosco-sheet">
         <img src={logoSrc} alt={companyLegalName} className="aosco-cover-logo" />
 
@@ -1191,7 +1245,7 @@ export function Component({ hublData }: Props) {
           <Stat label="On air" value={onAir} />
           <Stat
             label="Investment"
-            value={totals ? `${formatCurrency(totals.investment, true)} + GST` : ""}
+            value={investment !== null ? `${formatCurrency(investment, true)} + GST` : ""}
             dark
           />
         </div>
@@ -1218,7 +1272,7 @@ export function Component({ hublData }: Props) {
         )}
       </section>
 
-      {/* ================= Page 2 — summary, booking, investment ================= */}
+      {/* ================= summary, booking, investment ================= */}
       <section className="aosco-sheet">
         <PageHead logoSrc={logoSrc} label={headLabel} />
 
@@ -1273,24 +1327,23 @@ export function Component({ hublData }: Props) {
         />
 
         <SectionTitle num="03">Investment at a glance</SectionTitle>
-        <div className="aosco-glance">
-          <GlanceTile label="Advertising investment" value={money(totals?.investment)} tone="dark" />
-          <GlanceTile label={`${agencyPrefix} commission ${rateLabel}`} value={money(totals?.commission)} />
+        <div className="aosco-glance aosco-glance--six">
+          <GlanceTile label="Market rate" value={money(marketRate)} />
+          <GlanceTile label={discountLabel} value={negativeMoney(discount)} />
+          <GlanceTile label={commissionLabel} value={negativeMoney(commission)} />
           <GlanceTile
-            label="Net (less agency comm)"
-            value={totals ? `${money(totals.net)} + GST` : "\u2014"}
+            label="Investment"
+            value={investment !== null ? `${money(investment)} + GST` : "\u2014"}
+            tone="dark"
           />
-          <GlanceTile label="Total due inc GST" value={money(totals?.total)} tone="gold" />
+          <GlanceTile label={`GST ${formatRate(GST_RATE)}`} value={money(gstAmount)} />
+          <GlanceTile label="Total investment inc GST" value={money(totalInvestment)} tone="gold" />
         </div>
         {bonusNote && <p className="aosco-note">{bonusNote}</p>}
-
-        <PageFoot text={footText} page={2} />
       </section>
 
-      {/* ================= Page 3 — campaign schedule (landscape) ================= */}
+      {/* ================= campaign schedule (landscape) ================= */}
       <section className="aosco-sheet aosco-sheet--landscape">
-        <PageHead logoSrc={logoSrc} label={headLabel} />
-
         <SectionTitle num="04">Campaign schedule</SectionTitle>
 
         {sites.length > 0 && weekColumns.length > 0 ? (
@@ -1317,7 +1370,12 @@ export function Component({ hublData }: Props) {
             <ScheduleGrid sites={sites} weeks={weekColumns} />
 
             <p className="aosco-h3">Placements</p>
-            <PlacementsTable sites={sites} />
+            <PlacementsTable
+              sites={sites}
+              discountRate={discountRate}
+              discountLabel={discountLabel}
+              commissionLabel={commissionLabel}
+            />
           </>
         ) : (
           <p>The schedule will be confirmed before the campaign starts.</p>
@@ -1332,37 +1390,37 @@ export function Component({ hublData }: Props) {
           </thead>
           <tbody>
             <tr>
-              <td>Advertising investment</td>
-              <td className="num">{money(totals?.investment)}</td>
+              <td>Market rate (before discounts)</td>
+              <td className="num">{money(marketRate)}</td>
+            </tr>
+            <tr>
+              <td>Less discount{discountRateLabel ? ` (${discountRateLabel})` : ""}</td>
+              <td className="num">{negativeMoney(discount)}</td>
             </tr>
             <tr>
               <td>
-                Less {agency.shortName ? `${agency.shortName} ` : ""}agency commission ({rateLabel})
+                Less {agency.shortName ? `${agency.shortName} ` : ""}agency commission{rateLabel ? ` (${rateLabel})` : ""}
               </td>
-              <td className="num">{negativeMoney(totals?.commission)}</td>
+              <td className="num">{negativeMoney(commission)}</td>
             </tr>
             <tr>
-              <td className="strong">Total less agency commission</td>
-              <td className="num strong">{money(totals?.net)}</td>
+              <td className="strong">Investment (ex GST)</td>
+              <td className="num strong">{money(investment)}</td>
             </tr>
             <tr>
               <td>Plus GST ({formatRate(GST_RATE)})</td>
-              <td className="num">{money(totals?.gst)}</td>
+              <td className="num">{money(gstAmount)}</td>
             </tr>
             <tr className="aosco-table-total">
-              <td>Total due to AOSco inc GST</td>
-              <td className="num">{money(totals?.total)}</td>
+              <td>Total investment inc GST</td>
+              <td className="num">{money(totalInvestment)}</td>
             </tr>
           </tbody>
         </table>
-
-        <PageFoot text={footText} page={3} />
       </section>
 
-      {/* ================= Page 4 — billing, conditions, execution ================= */}
+      {/* ================= billing, conditions, execution ================= */}
       <section className="aosco-sheet">
-        <PageHead logoSrc={logoSrc} label={headLabel} />
-
         <SectionTitle num="05">Billing</SectionTitle>
         {(accounts.name || accounts.email) && (
           <p className="aosco-accounts">
@@ -1374,10 +1432,8 @@ export function Component({ hublData }: Props) {
             <tr>
               <th style={{ width: "13%" }}>Flighting dates</th>
               <th style={{ width: "17%" }}>Billing cycle {BILLING_DAYS_EOM} days EOM</th>
-              <th className="num">Advertising investment</th>
-              <th className="num">
-                {agencyPrefix} commission {rateLabel}
-              </th>
+              <th className="num">Rate after discount</th>
+              <th className="num">{commissionLabel}</th>
               <th className="num">Total (less agency comm)</th>
               <th className="num">GST {formatRate(GST_RATE)}</th>
               <th className="num">Total due to AOSco inc GST</th>
@@ -1447,8 +1503,6 @@ export function Component({ hublData }: Props) {
             <SignField label="Date" value={execAosco.date} />
           </div>
         </div>
-
-        <PageFoot text={footText} page={4} />
       </section>
     </div>
   );
@@ -1465,7 +1519,7 @@ export const meta = {
 export const hublDataTemplate = `
   {% set dealData = {} %}
   {% if quoteTemplateContext.deal and quoteTemplateContext.deal.hs_object_id %}
-    {% set dealData = crm_object("deal", quoteTemplateContext.deal.hs_object_id, "hs_object_id,dealname,quote_master_data,agency_quote_master_data,agency_discount,campaign_start_date,campaign_end_date,total_commercial_rate,gst_amount,total_investment,advertiser_company,advertiser_contact_first_name,advertiser_contact_last_name,advertiser_person_phone_number,advertiser_person_email_address,agency_company_name,agency_person_first_name,agency_person_last_name,agency_person_email,agency_company_address,agency_address_line_2,agency_person_phone") %}
+    {% set dealData = crm_object("deal", quoteTemplateContext.deal.hs_object_id, "hs_object_id,dealname,quote_master_data,agency_quote_master_data,agency_discount,campaign_start_date,campaign_end_date,total_commercial_rate,gst_amount,total_investment,advertiser_company,advertiser_contact_first_name,advertiser_contact_last_name,advertiser_person_phone_number,advertiser_person_email_address,agency_company_name,agency_person_first_name,agency_person_last_name,agency_person_email,agency_company_address,agency_address_line_2,agency_person_phone,total_bill_amount_before_discount_total_market_rate") %}
   {% endif %}
 
   {% set hublData = {
@@ -1477,9 +1531,10 @@ export const hublDataTemplate = `
     "totalInvestment": dealData.total_investment,
     "investment": dealData.total_commercial_rate,
     "gstAmount": dealData.gst_amount,
+    "actualMarketRate": dealData.total_bill_amount_before_discount_total_market_rate,
     "scheduleSummaryJson": dealData.quote_master_data,
     "agencyQuoteJson": dealData.agency_quote_master_data,
-    "agencyDiscount": dealData.agency_disocunt,
+    "agencyDiscount": dealData.agency_discount,
 
     "advertiserCompany": dealData.advertiser_company,
     "advertiserFirstName": dealData.advertiser_contact_first_name,

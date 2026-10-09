@@ -35,12 +35,10 @@
 .aosco-prepared-org { color: var(--muted); }
 .aosco-ref { margin-top: 28px !important; color: var(--muted); font-size: 13px; }
 
-/* Inner page header / footer */
+/* Page header */
 .aosco-page-head { display: flex; align-items: flex-end; justify-content: space-between; padding-bottom: 8px; border-bottom: 1px solid var(--line); }
 .aosco-page-head img { height: 40px; display: block; }
 .aosco-page-head-ref { color: var(--muted); font-size: 12px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
-.aosco-page-foot { display: flex; justify-content: space-between; margin-top: 40px; padding-top: 8px; border-top: 1px solid var(--line); color: var(--muted); font-size: 11px; }
-.aosco-page-foot strong { color: var(--ink); font-size: 14px; font-weight: 400; }
 
 /* Section headings */
 .aosco-h2 { display: flex; gap: 12px; margin: 26px 0 14px; padding-bottom: 6px; border-bottom: 3px solid var(--navy); color: var(--navy); font-size: 18px; font-weight: 800; letter-spacing: 0.02em; text-transform: uppercase; }
@@ -59,6 +57,8 @@
 
 /* Investment at a glance */
 .aosco-glance { display: grid; grid-template-columns: repeat(4, 1fr); gap: 2px; border-top: 3px solid var(--navy); }
+.aosco-glance--six { grid-template-columns: repeat(3, 1fr); }
+.aosco-glance--five { grid-template-columns: repeat(5, 1fr); }
 .aosco-glance-tile { background: var(--panel); padding: 14px 14px 16px; }
 .aosco-glance-label { color: var(--muted); font-size: 11px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; }
 .aosco-glance-value { margin-top: 4px; color: var(--navy); font-size: 18px; font-weight: 700; }
@@ -102,6 +102,8 @@
 .aosco-table-total td { background: var(--panel-2); font-weight: 700; color: var(--navy); }
 .aosco-table-bonus { color: var(--gold-ink); }
 .aosco-table-small { color: var(--muted); font-size: 11px; }
+.aosco-table--compact { font-size: 11px; }
+.aosco-table--compact th, .aosco-table--compact td { padding: 6px 7px; }
 .aosco-gap { margin-top: 28px; }
 .aosco-accounts { margin-bottom: 10px !important; }
 

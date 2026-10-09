@@ -1,2227 +1,16 @@
-// import React from "react";
-
-// import { fields } from "./fields";
-
-// export { fields };
-
-// export interface AdvertiserDetails {
-//   greetingName: string;
-//   companyName: string;
-//   contactName: string;
-//   phone: string;
-//   email: string;
-//   address: string;
-// }
-
-// export interface AccountDetails {
-//   accountsName: string;
-//   accountsProcess: string;
-//   accountsEmail: string;
-// }
-
-// export interface AgencyDetails {
-//   agencyName: string;
-//   addressLine1: string;
-//   addressLine2: string;
-//   contactName: string;
-//   phone: string;
-//   email: string;
-// }
-
-// export interface CampaignBooking {
-//   campaignName: string;
-//   referenceId: string;
-//   siteSizeType: string;
-//   type: string;
-//   weeksRequired: number;
-//   startDate: string;
-//   endDate: string;
-// }
-
-// export interface ScheduleMeta {
-//   locality: string;
-//   cashContraLabel: string;
-//   weekCommencingLabel: string;
-//   bonusPlacementLabel: string;
-//   reachInfoLabel: string;
-//   broadcastInfoLabel: string;
-//   bonusNote: string;
-// }
-
-// export interface BillingRow {
-//   flighting: string;
-//   billingDate: string;
-//   investment: number;
-//   gst: number;
-//   total: number;
-// }
-
-// export interface Billing {
-//   attAccounts: string;
-//   invoice1: string;
-//   invoice2: string;
-//   rows: BillingRow[];
-// }
-
-// export interface ExecutionParty {
-//   representativeName: string;
-//   position: string;
-//   date: string;
-// }
-
-// export interface Execution {
-//   advertiser: ExecutionParty;
-//   aosco: ExecutionParty;
-// }
-
-// // The parsed shape of the quote_master_data JSON property.
-// export interface QuoteMasterData {
-//   logoSrc?: string;
-//   coverImageSrc?: string;
-//   documentTitle?: string;
-//   companyLegalName?: string;
-//   advertiser?: Partial<AdvertiserDetails>;
-//   account?: Partial<AccountDetails>;
-//   agency?: Partial<AgencyDetails>;
-//   campaign?: Partial<CampaignBooking>;
-//   weekDates?: string[];
-//   scheduleMeta?: Partial<ScheduleMeta>;
-//   billing?: Partial<Billing>;
-//   specialConditions?: string[];
-//   execution?: {
-//     advertiser?: Partial<ExecutionParty>;
-//     aosco?: Partial<ExecutionParty>;
-//   };
-// }
-
-// // ---------------------------------------------------------------------------
-// // HubSpot module types
-// // ---------------------------------------------------------------------------
-
-// type CrmValue = string | number | null | undefined;
-
-// // Must match the keys built in hublDataTemplate at the bottom of this file.
-// // Everything comes from the DEAL record only (single source of truth) —
-// // the billing contact / billing company on the quote are not read.
-// interface HublData {
-//   isQuoteBlueprint: boolean;
-
-//   // Deal
-//   dealId?: CrmValue;
-//   dealName?: CrmValue;
-//   campaignStartDate?: CrmValue; // HubSpot date property (epoch ms or YYYY-MM-DD)
-//   campaignEndDate?: CrmValue;
-//   scheduleSummaryJson?: unknown; // quote_master_data — usually a JSON string, parsed client-side below
-
-//   // Deal — billing amounts
-//   investment?: CrmValue; // total_commercial_rate (ex GST)
-//   gstAmount?: CrmValue; // gst_amount
-//   totalInvestment?: CrmValue; // total_investment (incl GST)
-
-//   // Deal — advertiser (also used for Account Details: same person)
-//   advertiserCompany?: CrmValue; // advertiser_company
-//   advertiserFirstName?: CrmValue; // advertiser_contact_first_name
-//   advertiserLastName?: CrmValue; // advertiser_contact_last_name
-//   advertiserPhone?: CrmValue; // advertiser_person_phone_number
-//   advertiserEmail?: CrmValue; // advertiser_person_email_address
-
-//   // Deal — agency (a different person)
-//   agencyCompanyName?: CrmValue; // agency_company_name
-//   agencyFirstName?: CrmValue; // agency_person_first_name
-//   agencyLastName?: CrmValue; // agency_person_last_name
-//   agencyEmail?: CrmValue; // agency_person_email
-//   agencyPhone?: CrmValue; // agency_person_email
-//   agencyAddress?: CrmValue; // agency_company_address
-//   agencyAddressLine2?: CrmValue; // agency_address_line_2
-// }
-
-// interface Props {
-//   fieldValues: FieldValues;
-//   hublData: HublData;
-// }
-
-// interface FieldValues {}
-
-// // ---------------------------------------------------------------------------
-// // Helpers
-// // ---------------------------------------------------------------------------
-
-// function pad2(n: number): string {
-//   return String(n).padStart(2, "0");
-// }
-
-// // Formats a HubSpot deal date property (campaign_start_date etc.) as
-// // dd/mm/yyyy. HubSpot sends these as Australian day-first dates with a
-// // two- or four-digit year: "1/9/26", "01/09/26", "01/09/2026" -> "01/09/2026".
-// // Two-digit years are read as 20xx. Also accepts epoch timestamps and
-// // ISO "2026-09-01" in case the property format ever changes.
-// function formatHubspotDate(value: CrmValue): string {
-//   if (value === null || value === undefined) return "";
-//   const raw = String(value).trim();
-//   if (!raw) return "";
-
-//   // d/m/yy, dd/mm/yy, d/m/yyyy, dd/mm/yyyy (optionally followed by a time)
-//   const dmy = raw.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2}|\d{4})(?!\d)/);
-//   if (dmy) {
-//     const day = Number(dmy[1]);
-//     const month = Number(dmy[2]);
-//     const year = dmy[3].length === 2 ? 2000 + Number(dmy[3]) : Number(dmy[3]);
-//     if (month < 1 || month > 12 || day < 1 || day > 31) return "";
-//     return `${pad2(day)}/${pad2(month)}/${year}`;
-//   }
-
-//   // ISO "2026-09-01"
-//   const ymd = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
-//   if (ymd) return `${ymd[3]}/${ymd[2]}/${ymd[1]}`;
-
-//   // Epoch ms / seconds, including "1788220800000.0" and "1.7882208E12"
-//   if (/^\d+(\.\d+)?(e\+?\d+)?$/i.test(raw)) {
-//     const n = Number(raw);
-//     let date: Date | null = null;
-//     if (n > 1e11) date = new Date(n);
-//     else if (n > 1e8) date = new Date(n * 1000);
-//     if (!date || Number.isNaN(date.getTime())) return "";
-//     return `${pad2(date.getUTCDate())}/${pad2(date.getUTCMonth() + 1)}/${date.getUTCFullYear()}`;
-//   }
-
-//   return ""; // unknown format: show nothing rather than a wrong date
-// }
-
-// // Returns the first value that isn't null/undefined/blank, as a string.
-// function firstFilled(...values: CrmValue[]): string {
-//   for (const v of values) {
-//     if (v === null || v === undefined) continue;
-//     const s = String(v).trim();
-//     if (s !== "") return s;
-//   }
-//   return "";
-// }
-
-// // "Jane", "Smith" -> "Jane Smith"; skips blanks.
-// function fullName(first: CrmValue, last: CrmValue): string {
-//   return [first, last]
-//     .map((v) => firstFilled(v))
-//     .filter(Boolean)
-//     .join(" ");
-// }
-
-// function formatCurrency(value: number | string | null | undefined): string {
-//   const n = Number(value);
-//   if (!Number.isFinite(n)) return "$0.00";
-//   return n.toLocaleString("en-AU", {
-//     style: "currency",
-//     currency: "AUD",
-//     minimumFractionDigits: 2,
-//     maximumFractionDigits: 2,
-//   });
-// }
-
-// // quote_master_data can reach us in a few shapes depending on how HubL
-// // serialises it: a JSON string (normal), an already-parsed object, an
-// // HTML-escaped string (&quot;…), or a double-encoded JSON string.
-// function parseQuoteMasterData(raw: unknown): QuoteMasterData {
-//   if (!raw) return {};
-//   if (typeof raw === "object") return raw as QuoteMasterData;
-
-//   const tryParse = (text: string): unknown => {
-//     try {
-//       let parsed: unknown = JSON.parse(text);
-//       if (typeof parsed === "string") parsed = JSON.parse(parsed); // double-encoded
-//       return parsed;
-//     } catch {
-//       return null;
-//     }
-//   };
-
-//   const text = String(raw).trim();
-//   let parsed = tryParse(text);
-//   if (!parsed) {
-//     const decoded = text
-//       .replace(/&quot;|&#34;|&#x22;/g, '"')
-//       .replace(/&#39;|&#x27;|&apos;/g, "'")
-//       .replace(/&lt;/g, "<")
-//       .replace(/&gt;/g, ">")
-//       .replace(/&amp;/g, "&");
-//     parsed = tryParse(decoded);
-//   }
-//   return typeof parsed === "object" && parsed !== null
-//     ? (parsed as QuoteMasterData)
-//     : {};
-// }
-
-// function cx(...classes: Array<string | false | null | undefined>): string {
-//   return classes.filter(Boolean).join(" ");
-// }
-
-// // ---------------------------------------------------------------------------
-// // Billing helpers
-// // ---------------------------------------------------------------------------
-
-// // Month labels in the style used on the printed agreement ("SEPT – NOV").
-// const FLIGHT_MONTHS = [
-//   "JAN",
-//   "FEB",
-//   "MAR",
-//   "APR",
-//   "MAY",
-//   "JUNE",
-//   "JULY",
-//   "AUG",
-//   "SEPT",
-//   "OCT",
-//   "NOV",
-//   "DEC",
-// ];
-// const FULL_MONTHS = [
-//   "January",
-//   "February",
-//   "March",
-//   "April",
-//   "May",
-//   "June",
-//   "July",
-//   "August",
-//   "September",
-//   "October",
-//   "November",
-//   "December",
-// ];
-
-// function ordinalSuffix(day: number): string {
-//   const mod100 = day % 100;
-//   if (mod100 >= 11 && mod100 <= 13) return "th";
-//   switch (day % 10) {
-//     case 1:
-//       return "st";
-//     case 2:
-//       return "nd";
-//     case 3:
-//       return "rd";
-//     default:
-//       return "th";
-//   }
-// }
-
-// // Today's date in Queensland time, so a quote generated on a UTC server
-// // late in the Australian evening still shows the Australian date.
-// function todayInBrisbane(): { day: number; month: number; year: number } {
-//   try {
-//     const parts = new Intl.DateTimeFormat("en-AU", {
-//       timeZone: "Australia/Brisbane",
-//       day: "numeric",
-//       month: "numeric",
-//       year: "numeric",
-//     }).formatToParts(new Date());
-//     const get = (type: string) =>
-//       Number(parts.find((p) => p.type === type)?.value);
-//     const day = get("day");
-//     const month = get("month");
-//     const year = get("year");
-//     if (day && month && year) return { day, month, year };
-//   } catch {
-//     // Intl timeZone not supported — fall through to local time.
-//   }
-//   const now = new Date();
-//   return {
-//     day: now.getDate(),
-//     month: now.getMonth() + 1,
-//     year: now.getFullYear(),
-//   };
-// }
-
-// // "4000", "4,000.00", "$4,000.00", 4000 -> 4000; blank/unreadable -> null.
-// function toAmount(value: CrmValue): number | null {
-//   if (value === null || value === undefined) return null;
-//   const s = String(value).replace(/[^0-9.-]/g, "");
-//   if (s === "" || s === "-" || s === ".") return null;
-//   const n = Number(s);
-//   return Number.isFinite(n) ? n : null;
-// }
-
-// // ---------------------------------------------------------------------------
-// // Default data
-// // ---------------------------------------------------------------------------
-
-// const DEFAULT_ADVERTISER: AdvertiserDetails = {
-//   greetingName: "Nic",
-//   companyName: "",
-//   contactName: "",
-//   phone: "",
-//   email: "",
-//   address: "",
-// };
-// const DEFAULT_ACCOUNT: AccountDetails = {
-//   accountsName: "",
-//   accountsProcess: "Please send to Nic for distribution and payment",
-//   accountsEmail: "",
-// };
-// const DEFAULT_CAMPAIGN: CampaignBooking = {
-//   campaignName: "",
-//   referenceId: "AOS-",
-//   siteSizeType: "NETWORK",
-//   type: "",
-//   weeksRequired: 0,
-//   startDate: "",
-//   endDate: "",
-// };
-// const DEFAULT_EXECUTION: Execution = {
-//   advertiser: { representativeName: "", position: "Owner", date: "" },
-//   aosco: {
-//     representativeName: "Jesse McIntyre",
-//     position: "Sales Director",
-//     date: "",
-//   },
-// };
-
-// // Transcribed verbatim, including the source document's own numbering.
-// const DEFAULT_SPECIAL_CONDITIONS: string[] = [
-//   "Unlimited Material Changes / Uploads Included.",
-//   "CANCELLATION (COVID Consideration) - AOSco agrees to honour a 7-day cancellation deadline, effective up until Monday before campaign launch in writing.",
-//   "Execution - I acknowledge that I have received and read this Agreement, confirm that the details contained within (including regarding payments due) are correct and hereby agree to be bound to this Agreement and the Terms and Conditions as attached.",
-//   "AOSco will offer Bonus STA Sites to the same spec if we have the avails.",
-//   "Bonus offered in this campaign is placed as 100% Guaranteed Bonus",
-//   "AOSCO will allocate Photographer resources to capture Creative for Client Socials. Drone, Static, Video",
-//   "Discount applied of 10% on Total for up for payment.",
-// ];
-
-// // ---------------------------------------------------------------------------
-// // CSS — injected via <style>, since Tailwind isn't available in this runtime
-// // ---------------------------------------------------------------------------
-
-// const MODULE_CSS = `
-// .aosco-root { max-width: 64rem; margin: 0 auto; background: #ffffff; color: #111827; font-family: Arial, sans-serif; }
-
-// /* Cover page */
-// .aosco-cover { position: relative; display: flex; min-height: 900px; flex-direction: column; justify-content: space-between; overflow: hidden; background: linear-gradient(to bottom, #171717, #171717, #000000); color: #ffffff; }
-// .aosco-cover-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0.5; }
-// .aosco-cover-overlay { position: absolute; inset: 0; background: linear-gradient(to bottom, rgba(0,0,0,0.7), rgba(0,0,0,0.4), rgba(0,0,0,0.85)); }
-// .aosco-cover-center { position: relative; z-index: 10; display: flex; flex: 1 1 auto; flex-direction: column; align-items: center; justify-content: center; padding: 0 2rem; text-align: center; }
-// .aosco-cover-logo-img { height: 100%; width:100%; }
-// .aosco-text-logo { font-size: 3.75rem; font-weight: 900; line-height: 1; letter-spacing: -0.02em; }
-// .aosco-text-logo-sup { vertical-align: super; font-size: 1.5rem; }
-// .aosco-tagline { margin-top: 0.75rem; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.35em; color: rgba(255,255,255,0.8); }
-// .aosco-cover-footer { position: relative; z-index: 10; border-top: 1px solid rgba(255,255,255,0.25); padding: 2rem 2.5rem 4rem; text-align: center; }
-// .aosco-cover-company { font-size: 1.125rem; font-weight: 600; margin: 0; }
-// .aosco-divider { margin: 1.25rem auto; height: 1px; width: 10rem; background: rgba(255,255,255,0.4); }
-// .aosco-cover-title { font-size: 1.5rem; font-weight: 700; letter-spacing: 0.025em; margin: 0; }
-
-// /* Header bar */
-// .aosco-header-bar { display: flex; align-items: center; justify-content: space-between; background: #e5e7eb; padding: 1.25rem 2.5rem; }
-// .aosco-header-title { font-size: 1.25rem; font-weight: 700; letter-spacing: -0.02em; color: #111827; margin: 0; }
-// .aosco-header-logo-img { height: 2.5rem; }
-// .aosco-header-text-logo { font-size: 1.125rem; font-weight: 900; color: #111827; }
-// .aosco-header-text-logo-sup { vertical-align: super; font-size: 0.75rem; }
-
-// /* Body */
-// .aosco-body { padding: 2rem 2.5rem; font-size: 0.875rem; line-height: 1.5; }
-// .aosco-greeting { margin: 0 0 1rem; }
-// .aosco-intro { margin: 0 0 0.25rem; }
-// .aosco-intro-last { margin: 0 0 2rem; }
-
-// .aosco-section { margin-bottom: 2rem; }
-// .aosco-section--exec { margin-bottom: 2.5rem; }
-// .aosco-section-heading { font-weight: 700; margin: 0 0 0.5rem; }
-// .aosco-section-heading--mt { margin-top: 1.5rem; }
-// .aosco-section-heading--underline { text-decoration: underline; margin-bottom: 0.75rem; text-transform: uppercase; }
-
-// /* Field rows (label + underlined fill-in value) */
-// .aosco-field-row { display: flex; align-items: baseline; gap: 1.5rem; margin-bottom: 0.625rem; }
-// .aosco-field-label { width: 16rem; flex-shrink: 0; color: #1f2937; }
-// .aosco-field-value { flex: 1 1 auto; padding-bottom: 0.125rem; }
-// .aosco-field-value--underline { border-bottom: 1px solid #9ca3af; }
-
-// /* Special conditions */
-// .aosco-sc-list { margin: 0; padding-left: 1.5rem; color: #111827; }
-// .aosco-sc-list li { margin-bottom: 0.375rem; }
-
-// /* Execution */
-// .aosco-exec-intro { margin: 0 0 1.5rem; color: #1f2937; }
-// .aosco-exec-grid { display: grid; grid-template-columns: 1fr; gap: 2rem; }
-// @media (min-width: 640px) {
-//   .aosco-exec-grid { grid-template-columns: 1fr 1fr; }
-// }
-// .aosco-exec-col-title { margin: 0 0 0.75rem; }
-
-// /* Schedule table */
-// .aosco-table-scroll { width: 100%; overflow: hidden; }
-// .aosco-schedule-table { width: 100%; table-layout: fixed; border-collapse: collapse; font-size: 6px; line-height: 1.15; }
-// .aosco-cell { border: 1px solid #d1d5db; padding: 1px 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-// .aosco-cell--p1 { padding: 1px; }
-// .aosco-cell--wrap { white-space: normal; word-break: break-word; overflow-wrap: break-word; }
-
-// /* Billing table — single row, matching the printed agreement */
-// .aosco-billing { margin-top: 1.5rem; }
-// .aosco-billing-table { width: 100%; table-layout: fixed; border-collapse: collapse; font-size: 0.875rem; color: #000000; }
-// .aosco-billing-cell { border: 1px solid #000000; padding: 1rem 0.75rem; text-align: center; vertical-align: middle; }
-// .aosco-billing-head { padding-top: 1.5rem; padding-bottom: 1.5rem; font-weight: 400; }
-// .aosco-billing-cell sup { font-size: 0.65em; line-height: 0; }
-
-// /* Shared atomic utilities */
-// .text-white { color: #ffffff; }
-// .text-gray-900 { color: #111827; }
-// .text-gray-800 { color: #1f2937; }
-// .text-red-600 { color: #dc2626; }
-// .font-semibold { font-weight: 600; }
-// .font-bold { font-weight: 700; }
-// .font-normal { font-weight: 400; }
-// .italic { font-style: italic; }
-// .text-center { text-align: center; }
-// .text-left { text-align: left; }
-// .text-right { text-align: right; }
-// .bg-gray-100 { background: #f3f4f6; }
-// .bg-gray-200 { background: #e5e7eb; }
-// .bg-gray-300 { background: #d1d5db; }
-// .bg-gray-500 { background: #6b7280; }
-// .bg-blue-500 { background: #3b82f6; }
-// .bg-blue-700 { background: #1d4ed8; }
-// .bg-blue-900 { background: #1e3a8a; }
-// .bg-sky-200 { background: #bae6fd; }
-// .bg-sky-400 { background: #38bdf8; }
-// .bg-green-300 { background: #86efac; }
-// .bg-green-700 { background: #15803d; }
-// .bg-yellow-300 { background: #fde047; }
-
-// @media print {
-//   @page {
-//     size: A4 landscape;
-//     margin: 6mm;
-//   }
-//   .aosco-schedule-table, .aosco-billing-table {
-//     width: 100% !important;
-//   }
-// }
-// `;
-
-// // ---------------------------------------------------------------------------
-// // Small presentational pieces
-// // ---------------------------------------------------------------------------
-
-// interface FieldLineProps {
-//   label: string;
-//   value?: string | number | null;
-//   underline?: boolean;
-// }
-
-// function FieldLine({ label, value, underline = true }: FieldLineProps) {
-//   return (
-//     <div className="aosco-field-row">
-//       <span className="aosco-field-label">{label}</span>
-//       <span
-//         className={cx(
-//           "aosco-field-value",
-//           underline && "aosco-field-value--underline",
-//         )}
-//       >
-//         {value || "\u00A0"}
-//       </span>
-//     </div>
-//   );
-// }
-
-// // ---------------------------------------------------------------------------
-// // Billing table
-// // ---------------------------------------------------------------------------
-
-// interface BillingTableProps {
-//   campaignStartDate?: CrmValue;
-//   campaignEndDate?: CrmValue;
-//   investment?: CrmValue; // ex GST, before commission
-//   agencyCommission?: CrmValue; // optional — if empty, 10% of investment is used
-//   gstAmount?: CrmValue;
-//   totalInvestment?: CrmValue; // incl GST
-// }
-
-// function BillingTable({
-//   campaignStartDate,
-//   campaignEndDate,
-//   investment,
-//   agencyCommission,
-//   gstAmount,
-//   totalInvestment,
-// }: BillingTableProps) {
-//   // "AUG – OCT 2026", or "NOV 2026 – JAN 2027" when the campaign crosses a year.
-//   const flightingWithYear = (() => {
-//     const read = (v: CrmValue) => {
-//       const m = formatHubspotDate(v).match(/^\d{2}\/(\d{2})\/(\d{4})$/);
-//       return m ? { month: FLIGHT_MONTHS[Number(m[1]) - 1], year: m[2] } : null;
-//     };
-//     const s = read(campaignStartDate);
-//     const e = read(campaignEndDate);
-//     if (s && e) {
-//       if (s.year !== e.year)
-//         return `${s.month} ${s.year} \u2013 ${e.month} ${e.year}`;
-//       if (s.month !== e.month) return `${s.month} \u2013 ${e.month} ${e.year}`;
-//       return `${s.month} ${s.year}`;
-//     }
-//     const one = s || e;
-//     return one ? `${one.month} ${one.year}` : "";
-//   })();
-
-//   const today = todayInBrisbane();
-
-//   const investmentAmount = toAmount(investment);
-//   const commission =
-//     toAmount(agencyCommission) ??
-//     (investmentAmount !== null
-//       ? Math.round(investmentAmount * 0.1 * 100) / 100
-//       : null);
-//   const net =
-//     investmentAmount !== null ? investmentAmount - (commission ?? 0) : null;
-//   const gst = toAmount(gstAmount);
-//   const total =
-//     toAmount(totalInvestment) ??
-//     (net !== null || gst !== null ? (net ?? 0) + (gst ?? 0) : null);
-
-//   const money = (n: number | null) =>
-//     n !== null ? formatCurrency(n) : "\u00A0";
-
-//   return (
-//     <div className="aosco-billing">
-//       <table className="aosco-billing-table">
-//         <colgroup>
-//           <col style={{ width: "15%" }} />
-//           <col style={{ width: "16%" }} />
-//           <col style={{ width: "13%" }} />
-//           <col style={{ width: "14%" }} />
-//           <col style={{ width: "13%" }} />
-//           <col style={{ width: "12%" }} />
-//           <col style={{ width: "17%" }} />
-//         </colgroup>
-//         <thead>
-//           <tr>
-//             <th className={cx("aosco-billing-cell", "aosco-billing-head")}>
-//               Flighting Dates
-//             </th>
-//             <th className={cx("aosco-billing-cell", "aosco-billing-head")}>
-//               Billing Cycle 45
-//               <br />
-//               days EOM
-//             </th>
-//             <th className={cx("aosco-billing-cell", "aosco-billing-head")}>
-//               Advertising
-//               <br />
-//               Investment
-//             </th>
-//             <th className={cx("aosco-billing-cell", "aosco-billing-head")}>
-//               Agency
-//               <br />
-//               Commission
-//               <br />
-//               (10%)
-//             </th>
-//             <th className={cx("aosco-billing-cell", "aosco-billing-head")}>
-//               Total
-//               <br />
-//               <span className="italic">
-//                 (less
-//                 <br />
-//                 Agency
-//                 <br />
-//                 Comm
-//               </span>
-//               )
-//             </th>
-//             <th className={cx("aosco-billing-cell", "aosco-billing-head")}>
-//               plus
-//               <br />
-//               GST 10%
-//             </th>
-//             <th className={cx("aosco-billing-cell", "aosco-billing-head")}>
-//               Total Due to
-//               <br />
-//               AOSco
-//               <br />
-//               <span className="italic">incl</span> GST
-//             </th>
-//           </tr>
-//         </thead>
-//         <tbody>
-//           <tr>
-//             <td className="aosco-billing-cell">
-//               {flightingWithYear || "\u00A0"}
-//             </td>
-//             <td className="aosco-billing-cell">
-//               {today.day}
-//               <sup>{ordinalSuffix(today.day)}</sup>{" "}
-//               {FULL_MONTHS[today.month - 1].toUpperCase()} {today.year}
-//             </td>
-//             <td className="aosco-billing-cell">{money(investmentAmount)}</td>
-//             <td className="aosco-billing-cell">{money(commission)}</td>
-//             <td className="aosco-billing-cell">{money(net)}</td>
-//             <td className="aosco-billing-cell">{money(gst)}</td>
-//             <td className="aosco-billing-cell">{money(total)}</td>
-//           </tr>
-//           <tr>
-//             <td colSpan={6} className={cx("aosco-billing-cell", "text-right")}>
-//               Campaign Total
-//             </td>
-//             <td className="aosco-billing-cell" style={{ fontSize: "1.05rem" }}>
-//               {money(total)}
-//             </td>
-//           </tr>
-//         </tbody>
-//       </table>
-//     </div>
-//   );
-// }
-
-// // ---------------------------------------------------------------------------
-// // Component — HubSpot quote module entry point
-// // ---------------------------------------------------------------------------
-
-// export function Component({ hublData }: Props) {
-//   const h: HublData = hublData || ({} as HublData);
-
-//   const data = parseQuoteMasterData(h.scheduleSummaryJson);
-
-//   const documentTitle = data.documentTitle || "ADVERTISING AGREEMENT";
-//   const companyLegalName =
-//     data.companyLegalName || "Australian Outdoor Sign Company Pty Ltd";
-//   const coverSrc =
-//     "https://443453524.fs1.hubspotusercontent-ap1.net/hubfs/443453524/Quote%20Cover.png";
-//   const logoSrc =
-//     "https://443453524.fs1.hubspotusercontent-ap1.net/hubfs/443453524/logo.png";
-//   const coverImageSrc = data.coverImageSrc;
-
-//   // -------------------------------------------------------------------------
-//   // DEAL → form field mapping
-//   // Priority everywhere: deal property → quote_master_data JSON → default.
-//   // Advertiser and Accounts are the same person; Agency is a different one.
-//   // -------------------------------------------------------------------------
-//   const advertiserFullName = fullName(
-//     h.advertiserFirstName,
-//     h.advertiserLastName,
-//   );
-//   const agencyFullName = fullName(h.agencyFirstName, h.agencyLastName);
-
-//   // Advertiser Details
-//   const adv: AdvertiserDetails = {
-//     greetingName: firstFilled(
-//       h.advertiserFirstName,
-//       data.advertiser?.greetingName,
-//       DEFAULT_ADVERTISER.greetingName,
-//     ),
-//     companyName: firstFilled(h.advertiserCompany, data.advertiser?.companyName),
-//     contactName: firstFilled(advertiserFullName, data.advertiser?.contactName),
-//     phone: firstFilled(h.advertiserPhone, data.advertiser?.phone),
-//     email: firstFilled(h.advertiserEmail, data.advertiser?.email),
-//     address: firstFilled(data.advertiser?.address),
-//   };
-
-//   // Account Details — same person as the advertiser
-//   const acc: AccountDetails = {
-//     accountsName: firstFilled(adv.contactName, data.account?.accountsName),
-//     accountsProcess: firstFilled(
-//       data.account?.accountsProcess,
-//       adv.greetingName
-//         ? `Please send to ${adv.greetingName} for distribution and payment`
-//         : "",
-//       DEFAULT_ACCOUNT.accountsProcess,
-//     ),
-//     accountsEmail: firstFilled(adv.email, data.account?.accountsEmail),
-//   };
-
-//   // Agency Details — separate person
-//   const agency: AgencyDetails = {
-//     agencyName: firstFilled(h.agencyCompanyName, data.agency?.agencyName),
-//     addressLine1: firstFilled(h.agencyAddress, data.agency?.addressLine1),
-//     addressLine2: firstFilled(h.agencyAddressLine2, data.agency?.addressLine2),
-//     contactName: firstFilled(agencyFullName, data.agency?.contactName),
-//     phone: firstFilled(h.agencyPhone), // no agency phone property on the deal yet
-//     email: firstFilled(h.agencyEmail, data.agency?.email),
-//   };
-
-//   // Campaign Booking
-//   const camp: CampaignBooking = {
-//     campaignName: firstFilled(h.dealName, data.campaign?.campaignName),
-//     referenceId: firstFilled(
-//       data.campaign?.referenceId,
-//       h.dealId ? `AOS-${firstFilled(h.dealId)}` : "",
-//       DEFAULT_CAMPAIGN.referenceId,
-//     ),
-//     siteSizeType: firstFilled(
-//       data.campaign?.siteSizeType,
-//       DEFAULT_CAMPAIGN.siteSizeType,
-//     ),
-//     type: firstFilled(data.campaign?.type),
-//     weeksRequired: 0,
-//     startDate: formatHubspotDate(h.campaignStartDate),
-//     endDate: formatHubspotDate(h.campaignEndDate),
-//   };
-
-//   const exec: Execution = {
-//     advertiser: {
-//       ...DEFAULT_EXECUTION.advertiser,
-//       ...(data.execution?.advertiser || {}),
-//       representativeName: firstFilled(
-//         data.execution?.advertiser?.representativeName,
-//         adv.contactName,
-//       ),
-//     },
-//     aosco: { ...DEFAULT_EXECUTION.aosco, ...(data.execution?.aosco || {}) },
-//   };
-
-//   const specialConditions =
-//     data.specialConditions ?? DEFAULT_SPECIAL_CONDITIONS;
-
-//   return (
-//     <div className="aosco-root">
-//       <style>{MODULE_CSS}</style>
-
-//       {/* Cover page */}
-//       <section className="aosco-cover">
-//         {coverImageSrc && (
-//           <img src={coverImageSrc} alt="" className="aosco-cover-img" />
-//         )}
-//         <div className="aosco-cover-overlay" />
-
-//         <div className="aosco-cover-center">
-//           {coverSrc ? (
-//             <img
-//               src={coverSrc}
-//               alt={companyLegalName}
-//               className="aosco-cover-logo-img"
-//             />
-//           ) : (
-//             <div>
-//               <div className="aosco-text-logo">
-//                 AOS<span className="aosco-text-logo-sup">Co.</span>
-//               </div>
-//               <p className="aosco-tagline">Australian Outdoor Sign Company</p>
-//             </div>
-//           )}
-//         </div>
-//       </section>
-
-//       {/* Content page header bar */}
-//       <div className="aosco-header-bar">
-//         <h1 className="aosco-header-title">{documentTitle}</h1>
-//         {logoSrc ? (
-//           <img
-//             src={logoSrc}
-//             alt={companyLegalName}
-//             className="aosco-header-logo-img"
-//           />
-//         ) : (
-//           <span className="aosco-header-text-logo">
-//             AOS<span className="aosco-header-text-logo-sup">Co.</span>
-//           </span>
-//         )}
-//       </div>
-
-//       <div className="aosco-body">
-//         <p className="aosco-greeting">Dear {adv.greetingName || "\u00A0"},</p>
-//         <p className="aosco-intro">
-//           Thank you for the opportunity to provide our services to you.
-//         </p>
-//         <p className="aosco-intro-last">
-//           This document and the <strong>attached</strong> Terms and Conditions
-//           set out the basis on which AOSCO provide our services.
-//         </p>
-
-//         {/* Advertiser + Account + Agency Details */}
-//         <section className="aosco-section">
-//           <p className="aosco-section-heading">Advertiser Details</p>
-//           <FieldLine label="COMPANY NAME:" value={adv.companyName} />
-//           <FieldLine label="Contact Name:" value={adv.contactName} />
-//           <FieldLine label="Phone Number:" value={adv.phone} />
-//           <FieldLine label="Email Address:" value={adv.email} />
-
-//           <p
-//             className={cx("aosco-section-heading", "aosco-section-heading--mt")}
-//           >
-//             Account Details
-//           </p>
-//           <FieldLine label="Accounts Name:" value={acc.accountsName} />
-//           <FieldLine
-//             label="Accounts Process:"
-//             value={acc.accountsProcess}
-//             underline={false}
-//           />
-//           <FieldLine label="Accounts Email 1:" value={acc.accountsEmail} />
-
-//           <p
-//             className={cx("aosco-section-heading", "aosco-section-heading--mt")}
-//           >
-//             Agency Details
-//           </p>
-//           <FieldLine label="Agency Name:" value={agency.agencyName} />
-//           <FieldLine label="Address:" value={agency.addressLine1} />
-//           <FieldLine label={"\u00A0"} value={agency.addressLine2} />
-//           <FieldLine label="Contact Name:" value={agency.contactName} />
-//           <FieldLine label="Phone Number:" value={agency.phone} />
-//           <FieldLine label="Email Address:" value={agency.email} />
-//         </section>
-
-//         {/* Campaign Booking */}
-//         <section className="aosco-section">
-//           <p className="aosco-section-heading">Campaign Booking</p>
-//           <FieldLine label="Campaign Name:" value={camp.campaignName} />
-//           <FieldLine label="Reference ID:" value={camp.referenceId} />
-//           <FieldLine
-//             label="Site, Size & Type of Selected Billboards:"
-//             value={camp.siteSizeType}
-//           />
-//           <FieldLine label="Type:" value={camp.type} />
-//           <FieldLine label="Weeks Required:" value={camp.weeksRequired} />
-//           <FieldLine label="Start Date:" value={camp.startDate} />
-//           <FieldLine label="End Date:" value={camp.endDate} />
-//         </section>
-
-//         {/* Schedule + Billing */}
-//         <section className="aosco-section">
-//           <p className="aosco-section-heading aosco-section-heading--underline">
-//             Schedule:
-//           </p>
-
-//           <p>
-//             Schedule Below runs for 6 weeks as planned below across the AOSCO
-//             Network{" "}
-//           </p>
-
-//           <br />
-//           <p className="aosco-section-heading aosco-section-heading--underline">
-//             Billing:
-//           </p>
-//           <p className="aosco-section-heading">
-//             AOSCO is offering a 10% Discount for Upfront Billing from $10,000
-//             Investment
-//           </p>
-
-//           <BillingTable
-//             campaignStartDate={h.campaignStartDate}
-//             campaignEndDate={h.campaignEndDate}
-//             investment={h.investment}
-//             gstAmount={h.gstAmount}
-//             totalInvestment={h.totalInvestment}
-//           />
-//         </section>
-
-//         {/* Special Conditions */}
-//         <section className="aosco-section">
-//           <p className="aosco-section-heading aosco-section-heading--underline">
-//             Special conditions:
-//           </p>
-//           <ol className="aosco-sc-list" style={{ listStyleType: "decimal" }}>
-//             {specialConditions.map((c, i) => (
-//               <li key={i}>{c}</li>
-//             ))}
-//           </ol>
-//         </section>
-
-//         {/* Execution / signatures */}
-//         <section className="aosco-section aosco-section--exec">
-//           <p className="aosco-section-heading">Execution</p>
-//           <p className="aosco-exec-intro">
-//             I acknowledge that I have received and read this Agreement, confirm
-//             that the details contained within (including regarding payments due)
-//             are correct and hereby agree to be bound to this Agreement and the
-//             Terms and Conditions as <strong>attached.</strong>
-//           </p>
-//           <div className="aosco-exec-grid">
-//             <div>
-//               <p className="aosco-exec-col-title">
-//                 Executed on behalf of {adv.companyName || "\u00A0"} by
-//               </p>
-//               <FieldLine
-//                 label="Representative Name:"
-//                 value={exec.advertiser.representativeName}
-//               />
-//               <FieldLine label="Position:" value={exec.advertiser.position} />
-//               <FieldLine label="Date:" value={exec.advertiser.date} />
-//             </div>
-//             <div>
-//               <p className="aosco-exec-col-title">
-//                 Executed on behalf of {companyLegalName}
-//               </p>
-//               <FieldLine
-//                 label="Representative Name:"
-//                 value={exec.aosco.representativeName}
-//               />
-//               <FieldLine label="Position:" value={exec.aosco.position} />
-//               <FieldLine label="Date:" value={exec.aosco.date} />
-//             </div>
-//           </div>
-//         </section>
-//       </div>
-//     </div>
-//   );
-// }
-
-// export const meta = {
-//   label: "AOSco Quote Agency",
-//   content_types: ["QUOTE", "QUOTE_BLUEPRINT"],
-// };
-
-// // Single source of truth: every value is read from the DEAL record.
-// // The billing contact / billing company attached to the quote are ignored.
-// // The deal lookup is guarded because a quote blueprint preview may not
-// // have a deal attached.
-// export const hublDataTemplate = `
-//   {% set dealData = {} %}
-//   {% if quoteTemplateContext.deal and quoteTemplateContext.deal.hs_object_id %}
-//     {% set dealData = crm_object("deal", quoteTemplateContext.deal.hs_object_id, "hs_object_id,dealname,quote_master_data,campaign_start_date,campaign_end_date,total_commercial_rate,gst_amount,total_investment,advertiser_company,advertiser_contact_first_name,advertiser_contact_last_name,advertiser_person_phone_number,advertiser_person_email_address,agency_company_name,agency_person_first_name,agency_person_last_name,agency_person_email,agency_company_address,agency_address_line_2,agency_person_phone") %}
-//   {% endif %}
-
-//   {% set hublData = {
-//     "isQuoteBlueprint": isQuoteBlueprint,
-//     "dealId": dealData.hs_object_id,
-//     "dealName": dealData.dealname,
-//     "campaignStartDate": dealData.campaign_start_date,
-//     "campaignEndDate": dealData.campaign_end_date,
-//     "totalInvestment": dealData.total_investment,
-//     "investment": dealData.total_commercial_rate,
-//     "gstAmount": dealData.gst_amount,
-//     "scheduleSummaryJson": dealData.quote_master_data,
-
-//     "advertiserCompany": dealData.advertiser_company,
-//     "advertiserFirstName": dealData.advertiser_contact_first_name,
-//     "advertiserLastName": dealData.advertiser_contact_last_name,
-//     "advertiserPhone": dealData.advertiser_person_phone_number,
-//     "advertiserEmail": dealData.advertiser_person_email_address,
-
-//     "agencyCompanyName": dealData.agency_company_name,
-//     "agencyFirstName": dealData.agency_person_first_name,
-//     "agencyLastName": dealData.agency_person_last_name,
-//     "agencyEmail": dealData.agency_person_email,
-//     "agencyPhone": dealData.agency_person_phone,
-//     "agencyAddress": dealData.agency_company_address,
-//     "agencyAddressLine2": dealData.agency_address_line_2
-//   } %}
-// `;
-
-// import React from "react";
-
-// import { fields } from "./fields";
-
-// export { fields };
-
-// export interface AdvertiserDetails {
-//   greetingName: string;
-//   companyName: string;
-//   contactName: string;
-//   phone: string;
-//   email: string;
-//   address: string;
-// }
-
-// export interface AccountDetails {
-//   accountsName: string;
-//   accountsProcess: string;
-//   accountsEmail: string;
-// }
-
-// export interface AgencyDetails {
-//   agencyName: string;
-//   addressLine1: string;
-//   addressLine2: string;
-//   contactName: string;
-//   phone: string;
-//   email: string;
-// }
-
-// export interface CampaignBooking {
-//   campaignName: string;
-//   referenceId: string;
-//   siteSizeType: string;
-//   type: string;
-//   weeksRequired: number;
-//   startDate: string;
-//   endDate: string;
-// }
-
-// export interface ScheduleMeta {
-//   locality: string;
-//   cashContraLabel: string;
-//   weekCommencingLabel: string;
-//   bonusPlacementLabel: string;
-//   reachInfoLabel: string;
-//   broadcastInfoLabel: string;
-//   bonusNote: string;
-// }
-
-// export interface BillingRow {
-//   flighting: string;
-//   billingDate: string;
-//   investment: number;
-//   gst: number;
-//   total: number;
-// }
-
-// export interface Billing {
-//   attAccounts: string;
-//   invoice1: string;
-//   invoice2: string;
-//   rows: BillingRow[];
-// }
-
-// export interface ExecutionParty {
-//   representativeName: string;
-//   position: string;
-//   date: string;
-// }
-
-// export interface Execution {
-//   advertiser: ExecutionParty;
-//   aosco: ExecutionParty;
-// }
-
-// // The parsed shape of the quote_master_data JSON property.
-// export interface QuoteMasterData {
-//   logoSrc?: string;
-//   coverImageSrc?: string;
-//   documentTitle?: string;
-//   companyLegalName?: string;
-//   advertiser?: Partial<AdvertiserDetails>;
-//   account?: Partial<AccountDetails>;
-//   agency?: Partial<AgencyDetails>;
-//   campaign?: Partial<CampaignBooking>;
-//   weekDates?: string[];
-//   scheduleMeta?: Partial<ScheduleMeta>;
-//   billing?: Partial<Billing>;
-//   specialConditions?: string[];
-//   execution?: {
-//     advertiser?: Partial<ExecutionParty>;
-//     aosco?: Partial<ExecutionParty>;
-//   };
-// }
-
-// // The parsed shape of the agency_quote_master_data JSON property
-// // (built by the NestJS line-item sync). Short keys keep the JSON small.
-// export interface AgencyQuoteMonth {
-//   k: string; // month "YYYY-MM"
-//   w: number; // weeks booked (all schedules)
-//   r: number; // client total  -> "Total (less Agency Comm)"
-//   a: number; // agency commission
-// }
-
-// export interface AgencyQuoteSchedule {
-//   n: string | null; // name
-//   r: number; // client_rate_per_week
-//   a: number; // agency_discount_amount per week
-//   w: Record<string, number>; // weeks per month
-//   d?: string[]; // week-start dates "YYYY-MM-DD"
-// }
-
-// export interface AgencyQuoteMasterData {
-//   v?: number;
-//   m?: AgencyQuoteMonth[];
-//   s?: AgencyQuoteSchedule[];
-// }
-
-// // ---------------------------------------------------------------------------
-// // HubSpot module types
-// // ---------------------------------------------------------------------------
-
-// type CrmValue = string | number | null | undefined;
-
-// // Must match the keys built in hublDataTemplate at the bottom of this file.
-// // Everything comes from the DEAL record only (single source of truth) —
-// // the billing contact / billing company on the quote are not read.
-// interface HublData {
-//   isQuoteBlueprint: boolean;
-
-//   // Deal
-//   dealId?: CrmValue;
-//   dealName?: CrmValue;
-//   campaignStartDate?: CrmValue; // HubSpot date property (epoch ms or YYYY-MM-DD)
-//   campaignEndDate?: CrmValue;
-//   scheduleSummaryJson?: unknown; // quote_master_data — usually a JSON string, parsed client-side below
-//   agencyQuoteJson?: unknown; // agency_quote_master_data — month-wise billing, parsed client-side below
-
-//   // Deal — agency commission rate shown in the billing table header
-//   agencyDiscount?: CrmValue; // agency_discount (0.1 or 10 both mean 10%)
-
-//   // Deal — billing amounts (fallback when agency_quote_master_data is empty)
-//   investment?: CrmValue; // total_commercial_rate (ex GST)
-//   gstAmount?: CrmValue; // gst_amount
-//   totalInvestment?: CrmValue; // total_investment (incl GST)
-
-//   // Deal — advertiser (also used for Account Details: same person)
-//   advertiserCompany?: CrmValue; // advertiser_company
-//   advertiserFirstName?: CrmValue; // advertiser_contact_first_name
-//   advertiserLastName?: CrmValue; // advertiser_contact_last_name
-//   advertiserPhone?: CrmValue; // advertiser_person_phone_number
-//   advertiserEmail?: CrmValue; // advertiser_person_email_address
-
-//   // Deal — agency (a different person)
-//   agencyCompanyName?: CrmValue; // agency_company_name
-//   agencyFirstName?: CrmValue; // agency_person_first_name
-//   agencyLastName?: CrmValue; // agency_person_last_name
-//   agencyEmail?: CrmValue; // agency_person_email
-//   agencyPhone?: CrmValue; // agency_person_phone
-//   agencyAddress?: CrmValue; // agency_company_address
-//   agencyAddressLine2?: CrmValue; // agency_address_line_2
-// }
-
-// interface Props {
-//   fieldValues: FieldValues;
-//   hublData: HublData;
-// }
-
-// interface FieldValues {}
-
-// // ---------------------------------------------------------------------------
-// // Helpers
-// // ---------------------------------------------------------------------------
-
-// function pad2(n: number): string {
-//   return String(n).padStart(2, "0");
-// }
-
-// // Formats a HubSpot deal date property (campaign_start_date etc.) as
-// // dd/mm/yyyy. HubSpot sends these as Australian day-first dates with a
-// // two- or four-digit year: "1/9/26", "01/09/26", "01/09/2026" -> "01/09/2026".
-// // Two-digit years are read as 20xx. Also accepts epoch timestamps and
-// // ISO "2026-09-01" in case the property format ever changes.
-// function formatHubspotDate(value: CrmValue): string {
-//   if (value === null || value === undefined) return "";
-//   const raw = String(value).trim();
-//   if (!raw) return "";
-
-//   // d/m/yy, dd/mm/yy, d/m/yyyy, dd/mm/yyyy (optionally followed by a time)
-//   const dmy = raw.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2}|\d{4})(?!\d)/);
-//   if (dmy) {
-//     const day = Number(dmy[1]);
-//     const month = Number(dmy[2]);
-//     const year = dmy[3].length === 2 ? 2000 + Number(dmy[3]) : Number(dmy[3]);
-//     if (month < 1 || month > 12 || day < 1 || day > 31) return "";
-//     return `${pad2(day)}/${pad2(month)}/${year}`;
-//   }
-
-//   // ISO "2026-09-01"
-//   const ymd = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
-//   if (ymd) return `${ymd[3]}/${ymd[2]}/${ymd[1]}`;
-
-//   // Epoch ms / seconds, including "1788220800000.0" and "1.7882208E12"
-//   if (/^\d+(\.\d+)?(e\+?\d+)?$/i.test(raw)) {
-//     const n = Number(raw);
-//     let date: Date | null = null;
-//     if (n > 1e11) date = new Date(n);
-//     else if (n > 1e8) date = new Date(n * 1000);
-//     if (!date || Number.isNaN(date.getTime())) return "";
-//     return `${pad2(date.getUTCDate())}/${pad2(date.getUTCMonth() + 1)}/${date.getUTCFullYear()}`;
-//   }
-
-//   return ""; // unknown format: show nothing rather than a wrong date
-// }
-
-// // Returns the first value that isn't null/undefined/blank, as a string.
-// function firstFilled(...values: CrmValue[]): string {
-//   for (const v of values) {
-//     if (v === null || v === undefined) continue;
-//     const s = String(v).trim();
-//     if (s !== "") return s;
-//   }
-//   return "";
-// }
-
-// // "Jane", "Smith" -> "Jane Smith"; skips blanks.
-// function fullName(first: CrmValue, last: CrmValue): string {
-//   return [first, last]
-//     .map((v) => firstFilled(v))
-//     .filter(Boolean)
-//     .join(" ");
-// }
-
-// function formatCurrency(value: number | string | null | undefined): string {
-//   const n = Number(value);
-//   if (!Number.isFinite(n)) return "$0.00";
-//   return n.toLocaleString("en-AU", {
-//     style: "currency",
-//     currency: "AUD",
-//     minimumFractionDigits: 2,
-//     maximumFractionDigits: 2,
-//   });
-// }
-
-// // JSON deal properties can reach us in a few shapes depending on how HubL
-// // serialises them: a JSON string (normal), an already-parsed object, an
-// // HTML-escaped string (&quot;…), or a double-encoded JSON string.
-// function parseJsonProperty<T extends object>(raw: unknown): Partial<T> {
-//   if (!raw) return {};
-//   if (typeof raw === "object") return raw as Partial<T>;
-
-//   const tryParse = (text: string): unknown => {
-//     try {
-//       let parsed: unknown = JSON.parse(text);
-//       if (typeof parsed === "string") parsed = JSON.parse(parsed); // double-encoded
-//       return parsed;
-//     } catch {
-//       return null;
-//     }
-//   };
-
-//   const text = String(raw).trim();
-//   let parsed = tryParse(text);
-//   if (!parsed) {
-//     const decoded = text
-//       .replace(/&quot;|&#34;|&#x22;/g, '"')
-//       .replace(/&#39;|&#x27;|&apos;/g, "'")
-//       .replace(/&lt;/g, "<")
-//       .replace(/&gt;/g, ">")
-//       .replace(/&amp;/g, "&");
-//     parsed = tryParse(decoded);
-//   }
-//   return typeof parsed === "object" && parsed !== null
-//     ? (parsed as Partial<T>)
-//     : {};
-// }
-
-// function parseQuoteMasterData(raw: unknown): QuoteMasterData {
-//   return parseJsonProperty<QuoteMasterData>(raw) as QuoteMasterData;
-// }
-
-// function parseAgencyQuoteMasterData(raw: unknown): AgencyQuoteMasterData {
-//   return parseJsonProperty<AgencyQuoteMasterData>(raw) as AgencyQuoteMasterData;
-// }
-
-// function cx(...classes: Array<string | false | null | undefined>): string {
-//   return classes.filter(Boolean).join(" ");
-// }
-
-// // ---------------------------------------------------------------------------
-// // Billing helpers
-// // ---------------------------------------------------------------------------
-
-// // Month labels in the style used on the printed agreement ("SEPT – NOV").
-// const FLIGHT_MONTHS = [
-//   "JAN",
-//   "FEB",
-//   "MAR",
-//   "APR",
-//   "MAY",
-//   "JUNE",
-//   "JULY",
-//   "AUG",
-//   "SEPT",
-//   "OCT",
-//   "NOV",
-//   "DEC",
-// ];
-// const FULL_MONTHS = [
-//   "January",
-//   "February",
-//   "March",
-//   "April",
-//   "May",
-//   "June",
-//   "July",
-//   "August",
-//   "September",
-//   "October",
-//   "November",
-//   "December",
-// ];
-
-// const GST_RATE = 0.1;
-// const DEFAULT_COMMISSION_RATE = 0.1; // only used when deal.agency_discount is empty
-
-// function ordinalSuffix(day: number): string {
-//   const mod100 = day % 100;
-//   if (mod100 >= 11 && mod100 <= 13) return "th";
-//   switch (day % 10) {
-//     case 1:
-//       return "st";
-//     case 2:
-//       return "nd";
-//     case 3:
-//       return "rd";
-//     default:
-//       return "th";
-//   }
-// }
-
-// // Today's date in Queensland time, so a quote generated on a UTC server
-// // late in the Australian evening still shows the Australian date.
-// function todayInBrisbane(): { day: number; month: number; year: number } {
-//   try {
-//     const parts = new Intl.DateTimeFormat("en-AU", {
-//       timeZone: "Australia/Brisbane",
-//       day: "numeric",
-//       month: "numeric",
-//       year: "numeric",
-//     }).formatToParts(new Date());
-//     const get = (type: string) =>
-//       Number(parts.find((p) => p.type === type)?.value);
-//     const day = get("day");
-//     const month = get("month");
-//     const year = get("year");
-//     if (day && month && year) return { day, month, year };
-//   } catch {
-//     // Intl timeZone not supported — fall through to local time.
-//   }
-//   const now = new Date();
-//   return {
-//     day: now.getDate(),
-//     month: now.getMonth() + 1,
-//     year: now.getFullYear(),
-//   };
-// }
-
-// // "4000", "4,000.00", "$4,000.00", 4000 -> 4000; blank/unreadable -> null.
-// function toAmount(value: CrmValue): number | null {
-//   if (value === null || value === undefined) return null;
-//   const s = String(value).replace(/[^0-9.-]/g, "");
-//   if (s === "" || s === "-" || s === ".") return null;
-//   const n = Number(s);
-//   return Number.isFinite(n) ? n : null;
-// }
-
-// // Rounds to cents, avoiding float drift (1.005 -> 1.01).
-// function round2(n: number): number {
-//   return Math.round((n + Number.EPSILON) * 100) / 100;
-// }
-
-// // 0.1111 -> "11.1%", 0.1 -> "10%".
-// function formatRate(rate: number): string {
-//   return `${Number((rate * 100).toFixed(2))}%`;
-// }
-
-// // deal.agency_discount as a fraction: "0.1", "10", "10%" -> 0.1.
-// // Values above 1 are read as a percentage. Blank/unreadable -> null.
-// function toRate(value: CrmValue): number | null {
-//   const n = toAmount(value);
-//   if (n === null || n < 0) return null;
-//   return n > 1 ? n / 100 : n;
-// }
-
-// interface AgencyBillingRow {
-//   key: string; // "2026-09"
-//   flighting: string; // "SEPT 2026"
-//   billingDay: number; // last day of the month (EOM)
-//   billingMonth: number; // 1-12
-//   billingYear: number;
-//   investment: number; // r + a
-//   commission: number; // a
-//   net: number; // r
-//   gst: number; // 10% of net (Total less Agency Comm)
-//   total: number; // net + GST
-// }
-
-// // One billing row per month in agency_quote_master_data.m, oldest first.
-// // Months that can't be read are left out.
-// function toAgencyBillingRows(data: AgencyQuoteMasterData): AgencyBillingRow[] {
-//   const months = Array.isArray(data.m) ? data.m : [];
-
-//   return months
-//     .map((m): AgencyBillingRow | null => {
-//       const match = /^(\d{4})-(\d{2})$/.exec(String(m?.k ?? ""));
-//       if (!match) return null;
-
-//       const year = Number(match[1]);
-//       const month = Number(match[2]);
-//       if (month < 1 || month > 12) return null;
-
-//       const net = round2(Number(m.r) || 0);
-//       const commission = round2(Number(m.a) || 0);
-//       const investment = round2(net + commission);
-//       const gst = round2(net * GST_RATE); // GST is on the amount after agency commission
-//       const total = round2(net + gst);
-
-//       return {
-//         key: match[0],
-//         flighting: `${FLIGHT_MONTHS[month - 1]} ${year}`,
-//         billingDay: new Date(Date.UTC(year, month, 0)).getUTCDate(), // day 0 of next month = EOM
-//         billingMonth: month,
-//         billingYear: year,
-//         investment,
-//         commission,
-//         net,
-//         gst,
-//         total,
-//       };
-//     })
-//     .filter((row): row is AgencyBillingRow => row !== null)
-//     .sort((x, y) => x.key.localeCompare(y.key));
-// }
-
-// // ---------------------------------------------------------------------------
-// // Default data
-// // ---------------------------------------------------------------------------
-
-// const DEFAULT_ADVERTISER: AdvertiserDetails = {
-//   greetingName: "Nic",
-//   companyName: "",
-//   contactName: "",
-//   phone: "",
-//   email: "",
-//   address: "",
-// };
-// const DEFAULT_ACCOUNT: AccountDetails = {
-//   accountsName: "",
-//   accountsProcess: "Please send to Nic for distribution and payment",
-//   accountsEmail: "",
-// };
-// const DEFAULT_CAMPAIGN: CampaignBooking = {
-//   campaignName: "",
-//   referenceId: "AOS-",
-//   siteSizeType: "NETWORK",
-//   type: "",
-//   weeksRequired: 0,
-//   startDate: "",
-//   endDate: "",
-// };
-// const DEFAULT_EXECUTION: Execution = {
-//   advertiser: { representativeName: "", position: "Owner", date: "" },
-//   aosco: {
-//     representativeName: "Jesse McIntyre",
-//     position: "Sales Director",
-//     date: "",
-//   },
-// };
-
-// // Transcribed verbatim, including the source document's own numbering.
-// const DEFAULT_SPECIAL_CONDITIONS: string[] = [
-//   "Unlimited Material Changes / Uploads Included.",
-//   "CANCELLATION (COVID Consideration) - AOSco agrees to honour a 7-day cancellation deadline, effective up until Monday before campaign launch in writing.",
-//   "Execution - I acknowledge that I have received and read this Agreement, confirm that the details contained within (including regarding payments due) are correct and hereby agree to be bound to this Agreement and the Terms and Conditions as attached.",
-//   "AOSco will offer Bonus STA Sites to the same spec if we have the avails.",
-//   "Bonus offered in this campaign is placed as 100% Guaranteed Bonus",
-//   "AOSCO will allocate Photographer resources to capture Creative for Client Socials. Drone, Static, Video",
-//   "Discount applied of 10% on Total for up for payment.",
-// ];
-
-// // ---------------------------------------------------------------------------
-// // CSS — injected via <style>, since Tailwind isn't available in this runtime
-// // ---------------------------------------------------------------------------
-
-// const MODULE_CSS = `
-// .aosco-root { max-width: 64rem; margin: 0 auto; background: #ffffff; color: #111827; font-family: Arial, sans-serif; }
-
-// /* Cover page */
-// .aosco-cover { position: relative; display: flex; min-height: 900px; flex-direction: column; justify-content: space-between; overflow: hidden; background: linear-gradient(to bottom, #171717, #171717, #000000); color: #ffffff; }
-// .aosco-cover-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0.5; }
-// .aosco-cover-overlay { position: absolute; inset: 0; background: linear-gradient(to bottom, rgba(0,0,0,0.7), rgba(0,0,0,0.4), rgba(0,0,0,0.85)); }
-// .aosco-cover-center { position: relative; z-index: 10; display: flex; flex: 1 1 auto; flex-direction: column; align-items: center; justify-content: center; padding: 0 2rem; text-align: center; }
-// .aosco-cover-logo-img { height: 100%; width:100%; }
-// .aosco-text-logo { font-size: 3.75rem; font-weight: 900; line-height: 1; letter-spacing: -0.02em; }
-// .aosco-text-logo-sup { vertical-align: super; font-size: 1.5rem; }
-// .aosco-tagline { margin-top: 0.75rem; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.35em; color: rgba(255,255,255,0.8); }
-// .aosco-cover-footer { position: relative; z-index: 10; border-top: 1px solid rgba(255,255,255,0.25); padding: 2rem 2.5rem 4rem; text-align: center; }
-// .aosco-cover-company { font-size: 1.125rem; font-weight: 600; margin: 0; }
-// .aosco-divider { margin: 1.25rem auto; height: 1px; width: 10rem; background: rgba(255,255,255,0.4); }
-// .aosco-cover-title { font-size: 1.5rem; font-weight: 700; letter-spacing: 0.025em; margin: 0; }
-
-// /* Header bar */
-// .aosco-header-bar { display: flex; align-items: center; justify-content: space-between; background: #e5e7eb; padding: 1.25rem 2.5rem; }
-// .aosco-header-title { font-size: 1.25rem; font-weight: 700; letter-spacing: -0.02em; color: #111827; margin: 0; }
-// .aosco-header-logo-img { height: 2.5rem; }
-// .aosco-header-text-logo { font-size: 1.125rem; font-weight: 900; color: #111827; }
-// .aosco-header-text-logo-sup { vertical-align: super; font-size: 0.75rem; }
-
-// /* Body */
-// .aosco-body { padding: 2rem 2.5rem; font-size: 0.875rem; line-height: 1.5; }
-// .aosco-greeting { margin: 0 0 1rem; }
-// .aosco-intro { margin: 0 0 0.25rem; }
-// .aosco-intro-last { margin: 0 0 2rem; }
-
-// .aosco-section { margin-bottom: 2rem; }
-// .aosco-section--exec { margin-bottom: 2.5rem; }
-// .aosco-section-heading { font-weight: 700; margin: 0 0 0.5rem; }
-// .aosco-section-heading--mt { margin-top: 1.5rem; }
-// .aosco-section-heading--underline { text-decoration: underline; margin-bottom: 0.75rem; text-transform: uppercase; }
-
-// /* Field rows (label + underlined fill-in value) */
-// .aosco-field-row { display: flex; align-items: baseline; gap: 1.5rem; margin-bottom: 0.625rem; }
-// .aosco-field-label { width: 16rem; flex-shrink: 0; color: #1f2937; }
-// .aosco-field-value { flex: 1 1 auto; padding-bottom: 0.125rem; }
-// .aosco-field-value--underline { border-bottom: 1px solid #9ca3af; }
-
-// /* Special conditions */
-// .aosco-sc-list { margin: 0; padding-left: 1.5rem; color: #111827; }
-// .aosco-sc-list li { margin-bottom: 0.375rem; }
-
-// /* Execution */
-// .aosco-exec-intro { margin: 0 0 1.5rem; color: #1f2937; }
-// .aosco-exec-grid { display: grid; grid-template-columns: 1fr; gap: 2rem; }
-// @media (min-width: 640px) {
-//   .aosco-exec-grid { grid-template-columns: 1fr 1fr; }
-// }
-// .aosco-exec-col-title { margin: 0 0 0.75rem; }
-
-// /* Schedule table */
-// .aosco-table-scroll { width: 100%; overflow: hidden; }
-// .aosco-schedule-table { width: 100%; table-layout: fixed; border-collapse: collapse; font-size: 6px; line-height: 1.15; }
-// .aosco-cell { border: 1px solid #d1d5db; padding: 1px 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-// .aosco-cell--p1 { padding: 1px; }
-// .aosco-cell--wrap { white-space: normal; word-break: break-word; overflow-wrap: break-word; }
-
-// /* Billing table — one row per month, matching the printed agreement */
-// .aosco-billing { margin-top: 1.5rem; }
-// .aosco-billing-table { width: 100%; table-layout: fixed; border-collapse: collapse; font-size: 0.875rem; color: #000000; }
-// .aosco-billing-cell { border: 1px solid #000000; padding: 1rem 0.75rem; text-align: center; vertical-align: middle; }
-// .aosco-billing-head { padding-top: 1.5rem; padding-bottom: 1.5rem; font-weight: 400; }
-// .aosco-billing-cell sup { font-size: 0.65em; line-height: 0; }
-// .aosco-billing-total td { font-weight: 700; }
-// .aosco-billing-grand { font-size: 1.05rem; }
-
-// /* Shared atomic utilities */
-// .text-white { color: #ffffff; }
-// .text-gray-900 { color: #111827; }
-// .text-gray-800 { color: #1f2937; }
-// .text-red-600 { color: #dc2626; }
-// .font-semibold { font-weight: 600; }
-// .font-bold { font-weight: 700; }
-// .font-normal { font-weight: 400; }
-// .italic { font-style: italic; }
-// .text-center { text-align: center; }
-// .text-left { text-align: left; }
-// .text-right { text-align: right; }
-// .bg-gray-100 { background: #f3f4f6; }
-// .bg-gray-200 { background: #e5e7eb; }
-// .bg-gray-300 { background: #d1d5db; }
-// .bg-gray-500 { background: #6b7280; }
-// .bg-blue-500 { background: #3b82f6; }
-// .bg-blue-700 { background: #1d4ed8; }
-// .bg-blue-900 { background: #1e3a8a; }
-// .bg-sky-200 { background: #bae6fd; }
-// .bg-sky-400 { background: #38bdf8; }
-// .bg-green-300 { background: #86efac; }
-// .bg-green-700 { background: #15803d; }
-// .bg-yellow-300 { background: #fde047; }
-
-// @media print {
-//   @page {
-//     size: A4 landscape;
-//     margin: 6mm;
-//   }
-//   .aosco-schedule-table, .aosco-billing-table {
-//     width: 100% !important;
-//   }
-//   .aosco-billing-table tr { page-break-inside: avoid; }
-// }
-// `;
-
-// // ---------------------------------------------------------------------------
-// // Small presentational pieces
-// // ---------------------------------------------------------------------------
-
-// interface FieldLineProps {
-//   label: string;
-//   value?: string | number | null;
-//   underline?: boolean;
-// }
-
-// function FieldLine({ label, value, underline = true }: FieldLineProps) {
-//   return (
-//     <div className="aosco-field-row">
-//       <span className="aosco-field-label">{label}</span>
-//       <span
-//         className={cx(
-//           "aosco-field-value",
-//           underline && "aosco-field-value--underline",
-//         )}
-//       >
-//         {value || "\u00A0"}
-//       </span>
-//     </div>
-//   );
-// }
-
-// // ---------------------------------------------------------------------------
-// // Billing table
-// // ---------------------------------------------------------------------------
-
-// const money = (n: number | null) => (n !== null ? formatCurrency(n) : "\u00A0");
-
-// // "30th SEPTEMBER 2026"
-// function BillingDate({
-//   day,
-//   month,
-//   year,
-// }: {
-//   day: number;
-//   month: number;
-//   year: number;
-// }) {
-//   return (
-//     <>
-//       {day}
-//       <sup>{ordinalSuffix(day)}</sup> {FULL_MONTHS[month - 1].toUpperCase()}{" "}
-//       {year}
-//     </>
-//   );
-// }
-
-// function BillingColumns() {
-//   return (
-//     <colgroup>
-//       <col style={{ width: "15%" }} />
-//       <col style={{ width: "16%" }} />
-//       <col style={{ width: "13%" }} />
-//       <col style={{ width: "14%" }} />
-//       <col style={{ width: "13%" }} />
-//       <col style={{ width: "12%" }} />
-//       <col style={{ width: "17%" }} />
-//     </colgroup>
-//   );
-// }
-
-// function BillingHead({ commissionLabel }: { commissionLabel: string }) {
-//   return (
-//     <thead>
-//       <tr>
-//         <th className={cx("aosco-billing-cell", "aosco-billing-head")}>
-//           Flighting Dates
-//         </th>
-//         <th className={cx("aosco-billing-cell", "aosco-billing-head")}>
-//           Billing Cycle 45
-//           <br />
-//           days EOM
-//         </th>
-//         <th className={cx("aosco-billing-cell", "aosco-billing-head")}>
-//           Advertising
-//           <br />
-//           Investment
-//         </th>
-//         <th className={cx("aosco-billing-cell", "aosco-billing-head")}>
-//           Agency
-//           <br />
-//           Commission
-//           <br />({commissionLabel})
-//         </th>
-//         <th className={cx("aosco-billing-cell", "aosco-billing-head")}>
-//           Total
-//           <br />
-//           <span className="italic">
-//             (less
-//             <br />
-//             Agency
-//             <br />
-//             Comm
-//           </span>
-//           )
-//         </th>
-//         <th className={cx("aosco-billing-cell", "aosco-billing-head")}>
-//           plus
-//           <br />
-//           GST 10%
-//         </th>
-//         <th className={cx("aosco-billing-cell", "aosco-billing-head")}>
-//           Total Due to
-//           <br />
-//           AOSco
-//           <br />
-//           <span className="italic">incl</span> GST
-//         </th>
-//       </tr>
-//     </thead>
-//   );
-// }
-
-// interface BillingTableProps {
-//   agencyData?: AgencyQuoteMasterData; // month-wise rows (preferred)
-//   agencyDiscount?: CrmValue; // deal.agency_discount — commission % in the header
-
-//   // Fallback single row, used only when agency_quote_master_data is empty
-//   campaignStartDate?: CrmValue;
-//   campaignEndDate?: CrmValue;
-//   investment?: CrmValue; // ex GST, before commission
-//   agencyCommission?: CrmValue; // optional — if empty, 10% of investment is used
-//   gstAmount?: CrmValue;
-//   totalInvestment?: CrmValue; // incl GST
-// }
-
-// function BillingTable(props: BillingTableProps) {
-//   const rows = props.agencyData ? toAgencyBillingRows(props.agencyData) : [];
-//   const commissionRate = toRate(props.agencyDiscount) ?? DEFAULT_COMMISSION_RATE;
-//   const commissionLabel = formatRate(commissionRate);
-
-//   return rows.length > 0 ? (
-//     <MonthlyBillingTable rows={rows} commissionLabel={commissionLabel} />
-//   ) : (
-//     <SingleRowBillingTable
-//       {...props}
-//       commissionRate={commissionRate}
-//       commissionLabel={commissionLabel}
-//     />
-//   );
-// }
-
-// // One row per month from agency_quote_master_data, plus a Campaign Total row.
-// function MonthlyBillingTable({
-//   rows,
-//   commissionLabel,
-// }: {
-//   rows: AgencyBillingRow[];
-//   commissionLabel: string;
-// }) {
-//   const totals = rows.reduce(
-//     (t, r) => ({
-//       investment: round2(t.investment + r.investment),
-//       commission: round2(t.commission + r.commission),
-//       net: round2(t.net + r.net),
-//       gst: round2(t.gst + r.gst),
-//       total: round2(t.total + r.total),
-//     }),
-//     { investment: 0, commission: 0, net: 0, gst: 0, total: 0 },
-//   );
-
-//   return (
-//     <div className="aosco-billing">
-//       <table className="aosco-billing-table">
-//         <BillingColumns />
-//         <BillingHead commissionLabel={commissionLabel} />
-//         <tbody>
-//           {rows.map((row) => (
-//             <tr key={row.key}>
-//               <td className="aosco-billing-cell">{row.flighting}</td>
-//               <td className="aosco-billing-cell">
-//                 <BillingDate
-//                   day={row.billingDay}
-//                   month={row.billingMonth}
-//                   year={row.billingYear}
-//                 />
-//               </td>
-//               <td className="aosco-billing-cell">{money(row.investment)}</td>
-//               <td className="aosco-billing-cell">{money(row.commission)}</td>
-//               <td className="aosco-billing-cell">{money(row.net)}</td>
-//               <td className="aosco-billing-cell">{money(row.gst)}</td>
-//               <td className="aosco-billing-cell">{money(row.total)}</td>
-//             </tr>
-//           ))}
-//           <tr className="aosco-billing-total">
-//             <td colSpan={2} className={cx("aosco-billing-cell", "text-right")}>
-//               Campaign Total
-//             </td>
-//             <td className="aosco-billing-cell">{money(totals.investment)}</td>
-//             <td className="aosco-billing-cell">{money(totals.commission)}</td>
-//             <td className="aosco-billing-cell">{money(totals.net)}</td>
-//             <td className="aosco-billing-cell">{money(totals.gst)}</td>
-//             <td className={cx("aosco-billing-cell", "aosco-billing-grand")}>
-//               {money(totals.total)}
-//             </td>
-//           </tr>
-//         </tbody>
-//       </table>
-//     </div>
-//   );
-// }
-
-// // Original single-row table, from the deal's total amounts.
-// function SingleRowBillingTable({
-//   campaignStartDate,
-//   campaignEndDate,
-//   investment,
-//   agencyCommission,
-//   gstAmount,
-//   totalInvestment,
-//   commissionRate,
-//   commissionLabel,
-// }: BillingTableProps & { commissionRate: number; commissionLabel: string }) {
-//   // "AUG – OCT 2026", or "NOV 2026 – JAN 2027" when the campaign crosses a year.
-//   const flightingWithYear = (() => {
-//     const read = (v: CrmValue) => {
-//       const m = formatHubspotDate(v).match(/^\d{2}\/(\d{2})\/(\d{4})$/);
-//       return m ? { month: FLIGHT_MONTHS[Number(m[1]) - 1], year: m[2] } : null;
-//     };
-//     const s = read(campaignStartDate);
-//     const e = read(campaignEndDate);
-//     if (s && e) {
-//       if (s.year !== e.year)
-//         return `${s.month} ${s.year} \u2013 ${e.month} ${e.year}`;
-//       if (s.month !== e.month) return `${s.month} \u2013 ${e.month} ${e.year}`;
-//       return `${s.month} ${s.year}`;
-//     }
-//     const one = s || e;
-//     return one ? `${one.month} ${one.year}` : "";
-//   })();
-
-//   const today = todayInBrisbane();
-
-//   const investmentAmount = toAmount(investment);
-//   const commission =
-//     toAmount(agencyCommission) ??
-//     (investmentAmount !== null
-//       ? round2(investmentAmount * commissionRate)
-//       : null);
-//   const net =
-//     investmentAmount !== null ? round2(investmentAmount - (commission ?? 0)) : null;
-//   // GST is on the amount after agency commission
-//   const gst =
-//     net !== null ? round2(net * GST_RATE) : toAmount(gstAmount);
-//   const total =
-//     net !== null
-//       ? round2(net + (gst ?? 0))
-//       : toAmount(totalInvestment);
-
-//   return (
-//     <div className="aosco-billing">
-//       <table className="aosco-billing-table">
-//         <BillingColumns />
-//         <BillingHead commissionLabel={commissionLabel} />
-//         <tbody>
-//           <tr>
-//             <td className="aosco-billing-cell">
-//               {flightingWithYear || "\u00A0"}
-//             </td>
-//             <td className="aosco-billing-cell">
-//               <BillingDate
-//                 day={today.day}
-//                 month={today.month}
-//                 year={today.year}
-//               />
-//             </td>
-//             <td className="aosco-billing-cell">{money(investmentAmount)}</td>
-//             <td className="aosco-billing-cell">{money(commission)}</td>
-//             <td className="aosco-billing-cell">{money(net)}</td>
-//             <td className="aosco-billing-cell">{money(gst)}</td>
-//             <td className="aosco-billing-cell">{money(total)}</td>
-//           </tr>
-//           <tr>
-//             <td colSpan={6} className={cx("aosco-billing-cell", "text-right")}>
-//               Campaign Total
-//             </td>
-//             <td className={cx("aosco-billing-cell", "aosco-billing-grand")}>
-//               {money(total)}
-//             </td>
-//           </tr>
-//         </tbody>
-//       </table>
-//     </div>
-//   );
-// }
-
-// // ---------------------------------------------------------------------------
-// // Component — HubSpot quote module entry point
-// // ---------------------------------------------------------------------------
-
-// export function Component({ hublData }: Props) {
-//   const h: HublData = hublData || ({} as HublData);
-
-//   const data = parseQuoteMasterData(h.scheduleSummaryJson);
-//   const agencyData = parseAgencyQuoteMasterData(h.agencyQuoteJson);
-
-//   const documentTitle = data.documentTitle || "ADVERTISING AGREEMENT";
-//   const companyLegalName =
-//     data.companyLegalName || "Australian Outdoor Sign Company Pty Ltd";
-//   const coverSrc =
-//     "https://443453524.fs1.hubspotusercontent-ap1.net/hubfs/443453524/Quote%20Cover.png";
-//   const logoSrc =
-//     "https://443453524.fs1.hubspotusercontent-ap1.net/hubfs/443453524/logo.png";
-//   const coverImageSrc = data.coverImageSrc;
-
-//   // -------------------------------------------------------------------------
-//   // DEAL → form field mapping
-//   // Priority everywhere: deal property → quote_master_data JSON → default.
-//   // Advertiser and Accounts are the same person; Agency is a different one.
-//   // -------------------------------------------------------------------------
-//   const advertiserFullName = fullName(
-//     h.advertiserFirstName,
-//     h.advertiserLastName,
-//   );
-//   const agencyFullName = fullName(h.agencyFirstName, h.agencyLastName);
-
-//   // Advertiser Details
-//   const adv: AdvertiserDetails = {
-//     greetingName: firstFilled(
-//       h.advertiserFirstName,
-//       data.advertiser?.greetingName,
-//       DEFAULT_ADVERTISER.greetingName,
-//     ),
-//     companyName: firstFilled(h.advertiserCompany, data.advertiser?.companyName),
-//     contactName: firstFilled(advertiserFullName, data.advertiser?.contactName),
-//     phone: firstFilled(h.advertiserPhone, data.advertiser?.phone),
-//     email: firstFilled(h.advertiserEmail, data.advertiser?.email),
-//     address: firstFilled(data.advertiser?.address),
-//   };
-
-//   // Account Details — same person as the advertiser
-//   const acc: AccountDetails = {
-//     accountsName: firstFilled(adv.contactName, data.account?.accountsName),
-//     accountsProcess: firstFilled(
-//       data.account?.accountsProcess,
-//       adv.greetingName
-//         ? `Please send to ${adv.greetingName} for distribution and payment`
-//         : "",
-//       DEFAULT_ACCOUNT.accountsProcess,
-//     ),
-//     accountsEmail: firstFilled(adv.email, data.account?.accountsEmail),
-//   };
-
-//   // Agency Details — separate person
-//   const agency: AgencyDetails = {
-//     agencyName: firstFilled(h.agencyCompanyName, data.agency?.agencyName),
-//     addressLine1: firstFilled(h.agencyAddress, data.agency?.addressLine1),
-//     addressLine2: firstFilled(h.agencyAddressLine2, data.agency?.addressLine2),
-//     contactName: firstFilled(agencyFullName, data.agency?.contactName),
-//     phone: firstFilled(h.agencyPhone), // no agency phone property on the deal yet
-//     email: firstFilled(h.agencyEmail, data.agency?.email),
-//   };
-
-//   // Campaign Booking
-//   const camp: CampaignBooking = {
-//     campaignName: firstFilled(h.dealName, data.campaign?.campaignName),
-//     referenceId: firstFilled(
-//       data.campaign?.referenceId,
-//       h.dealId ? `AOS-${firstFilled(h.dealId)}` : "",
-//       DEFAULT_CAMPAIGN.referenceId,
-//     ),
-//     siteSizeType: firstFilled(
-//       data.campaign?.siteSizeType,
-//       DEFAULT_CAMPAIGN.siteSizeType,
-//     ),
-//     type: firstFilled(data.campaign?.type),
-//     weeksRequired: 0,
-//     startDate: formatHubspotDate(h.campaignStartDate),
-//     endDate: formatHubspotDate(h.campaignEndDate),
-//   };
-
-//   const exec: Execution = {
-//     advertiser: {
-//       ...DEFAULT_EXECUTION.advertiser,
-//       ...(data.execution?.advertiser || {}),
-//       representativeName: firstFilled(
-//         data.execution?.advertiser?.representativeName,
-//         adv.contactName,
-//       ),
-//     },
-//     aosco: { ...DEFAULT_EXECUTION.aosco, ...(data.execution?.aosco || {}) },
-//   };
-
-//   const specialConditions =
-//     data.specialConditions ?? DEFAULT_SPECIAL_CONDITIONS;
-
-//   return (
-//     <div className="aosco-root">
-//       <style>{MODULE_CSS}</style>
-
-//       {/* Cover page */}
-//       <section className="aosco-cover">
-//         {coverImageSrc && (
-//           <img src={coverImageSrc} alt="" className="aosco-cover-img" />
-//         )}
-//         <div className="aosco-cover-overlay" />
-
-//         <div className="aosco-cover-center">
-//           {coverSrc ? (
-//             <img
-//               src={coverSrc}
-//               alt={companyLegalName}
-//               className="aosco-cover-logo-img"
-//             />
-//           ) : (
-//             <div>
-//               <div className="aosco-text-logo">
-//                 AOS<span className="aosco-text-logo-sup">Co.</span>
-//               </div>
-//               <p className="aosco-tagline">Australian Outdoor Sign Company</p>
-//             </div>
-//           )}
-//         </div>
-//       </section>
-
-//       {/* Content page header bar */}
-//       <div className="aosco-header-bar">
-//         <h1 className="aosco-header-title">{documentTitle}</h1>
-//         {logoSrc ? (
-//           <img
-//             src={logoSrc}
-//             alt={companyLegalName}
-//             className="aosco-header-logo-img"
-//           />
-//         ) : (
-//           <span className="aosco-header-text-logo">
-//             AOS<span className="aosco-header-text-logo-sup">Co.</span>
-//           </span>
-//         )}
-//       </div>
-
-//       <div className="aosco-body">
-//         <p className="aosco-greeting">Dear {adv.greetingName || "\u00A0"},</p>
-//         <p className="aosco-intro">
-//           Thank you for the opportunity to provide our services to you.
-//         </p>
-//         <p className="aosco-intro-last">
-//           This document and the <strong>attached</strong> Terms and Conditions
-//           set out the basis on which AOSCO provide our services.
-//         </p>
-
-//         {/* Advertiser + Account + Agency Details */}
-//         <section className="aosco-section">
-//           <p className="aosco-section-heading">Advertiser Details</p>
-//           <FieldLine label="COMPANY NAME:" value={adv.companyName} />
-//           <FieldLine label="Contact Name:" value={adv.contactName} />
-//           <FieldLine label="Phone Number:" value={adv.phone} />
-//           <FieldLine label="Email Address:" value={adv.email} />
-
-//           <p
-//             className={cx("aosco-section-heading", "aosco-section-heading--mt")}
-//           >
-//             Account Details
-//           </p>
-//           <FieldLine label="Accounts Name:" value={acc.accountsName} />
-//           <FieldLine
-//             label="Accounts Process:"
-//             value={acc.accountsProcess}
-//             underline={false}
-//           />
-//           <FieldLine label="Accounts Email 1:" value={acc.accountsEmail} />
-
-//           <p
-//             className={cx("aosco-section-heading", "aosco-section-heading--mt")}
-//           >
-//             Agency Details
-//           </p>
-//           <FieldLine label="Agency Name:" value={agency.agencyName} />
-//           <FieldLine label="Address:" value={agency.addressLine1} />
-//           <FieldLine label={"\u00A0"} value={agency.addressLine2} />
-//           <FieldLine label="Contact Name:" value={agency.contactName} />
-//           <FieldLine label="Phone Number:" value={agency.phone} />
-//           <FieldLine label="Email Address:" value={agency.email} />
-//         </section>
-
-//         {/* Campaign Booking */}
-//         <section className="aosco-section">
-//           <p className="aosco-section-heading">Campaign Booking</p>
-//           <FieldLine label="Campaign Name:" value={camp.campaignName} />
-//           <FieldLine label="Reference ID:" value={camp.referenceId} />
-//           <FieldLine
-//             label="Site, Size & Type of Selected Billboards:"
-//             value={camp.siteSizeType}
-//           />
-//           <FieldLine label="Type:" value={camp.type} />
-//           <FieldLine label="Weeks Required:" value={camp.weeksRequired} />
-//           <FieldLine label="Start Date:" value={camp.startDate} />
-//           <FieldLine label="End Date:" value={camp.endDate} />
-//         </section>
-
-//         {/* Schedule + Billing */}
-//         <section className="aosco-section">
-//           <p className="aosco-section-heading aosco-section-heading--underline">
-//             Schedule:
-//           </p>
-
-//           <p>
-//             Schedule Below runs for 6 weeks as planned below across the AOSCO
-//             Network{" "}
-//           </p>
-
-//           <br />
-//           <p className="aosco-section-heading aosco-section-heading--underline">
-//             Billing:
-//           </p>
-//           <p className="aosco-section-heading">
-//             AOSCO is offering a 10% Discount for Upfront Billing from $10,000
-//             Investment
-//           </p>
-
-//           <BillingTable
-//             agencyData={agencyData}
-//             agencyDiscount={h.agencyDiscount}
-//             campaignStartDate={h.campaignStartDate}
-//             campaignEndDate={h.campaignEndDate}
-//             investment={h.investment}
-//             gstAmount={h.gstAmount}
-//             totalInvestment={h.totalInvestment}
-//           />
-//         </section>
-
-//         {/* Special Conditions */}
-//         <section className="aosco-section">
-//           <p className="aosco-section-heading aosco-section-heading--underline">
-//             Special conditions:
-//           </p>
-//           <ol className="aosco-sc-list" style={{ listStyleType: "decimal" }}>
-//             {specialConditions.map((c, i) => (
-//               <li key={i}>{c}</li>
-//             ))}
-//           </ol>
-//         </section>
-
-//         {/* Execution / signatures */}
-//         <section className="aosco-section aosco-section--exec">
-//           <p className="aosco-section-heading">Execution</p>
-//           <p className="aosco-exec-intro">
-//             I acknowledge that I have received and read this Agreement, confirm
-//             that the details contained within (including regarding payments due)
-//             are correct and hereby agree to be bound to this Agreement and the
-//             Terms and Conditions as <strong>attached.</strong>
-//           </p>
-//           <div className="aosco-exec-grid">
-//             <div>
-//               <p className="aosco-exec-col-title">
-//                 Executed on behalf of {adv.companyName || "\u00A0"} by
-//               </p>
-//               <FieldLine
-//                 label="Representative Name:"
-//                 value={exec.advertiser.representativeName}
-//               />
-//               <FieldLine label="Position:" value={exec.advertiser.position} />
-//               <FieldLine label="Date:" value={exec.advertiser.date} />
-//             </div>
-//             <div>
-//               <p className="aosco-exec-col-title">
-//                 Executed on behalf of {companyLegalName}
-//               </p>
-//               <FieldLine
-//                 label="Representative Name:"
-//                 value={exec.aosco.representativeName}
-//               />
-//               <FieldLine label="Position:" value={exec.aosco.position} />
-//               <FieldLine label="Date:" value={exec.aosco.date} />
-//             </div>
-//           </div>
-//         </section>
-//       </div>
-//     </div>
-//   );
-// }
-
-// export const meta = {
-//   label: "AOSco Quote Agency",
-//   content_types: ["QUOTE", "QUOTE_BLUEPRINT"],
-// };
-
-// // Single source of truth: every value is read from the DEAL record.
-// // The billing contact / billing company attached to the quote are ignored.
-// // The deal lookup is guarded because a quote blueprint preview may not
-// // have a deal attached.
-// export const hublDataTemplate = `
-//   {% set dealData = {} %}
-//   {% if quoteTemplateContext.deal and quoteTemplateContext.deal.hs_object_id %}
-//     {% set dealData = crm_object("deal", quoteTemplateContext.deal.hs_object_id, "hs_object_id,dealname,quote_master_data,agency_quote_master_data,agency_discount,campaign_start_date,campaign_end_date,total_commercial_rate,gst_amount,total_investment,advertiser_company,advertiser_contact_first_name,advertiser_contact_last_name,advertiser_person_phone_number,advertiser_person_email_address,agency_company_name,agency_person_first_name,agency_person_last_name,agency_person_email,agency_company_address,agency_address_line_2,agency_person_phone") %}
-//   {% endif %}
-
-//   {% set hublData = {
-//     "isQuoteBlueprint": isQuoteBlueprint,
-//     "dealId": dealData.hs_object_id,
-//     "dealName": dealData.dealname,
-//     "campaignStartDate": dealData.campaign_start_date,
-//     "campaignEndDate": dealData.campaign_end_date,
-//     "totalInvestment": dealData.total_investment,
-//     "investment": dealData.total_commercial_rate,
-//     "gstAmount": dealData.gst_amount,
-//     "scheduleSummaryJson": dealData.quote_master_data,
-//     "agencyQuoteJson": dealData.agency_quote_master_data,
-//     "agencyDiscount": dealData.agency_discount,
-
-//     "advertiserCompany": dealData.advertiser_company,
-//     "advertiserFirstName": dealData.advertiser_contact_first_name,
-//     "advertiserLastName": dealData.advertiser_contact_last_name,
-//     "advertiserPhone": dealData.advertiser_person_phone_number,
-//     "advertiserEmail": dealData.advertiser_person_email_address,
-
-//     "agencyCompanyName": dealData.agency_company_name,
-//     "agencyFirstName": dealData.agency_person_first_name,
-//     "agencyLastName": dealData.agency_person_last_name,
-//     "agencyEmail": dealData.agency_person_email,
-//     "agencyPhone": dealData.agency_person_phone,
-//     "agencyAddress": dealData.agency_company_address,
-//     "agencyAddressLine2": dealData.agency_address_line_2
-//   } %}
-// `;
-
 import React from "react";
 
 import { fields } from "./fields";
 
 // Styles live in a shared .css file; `?raw` imports it as a string so it can
 // still be injected via <style> (SSR + quote PDF render, no Tailwind here).
-import MODULE_CSS from '../../styles/aosco-quote.css?raw';
+import MODULE_CSS from '../../styles/aosco-quote-agency45.css?raw';
 
 export { fields };
+
+// ===========================================================================
+// Data shapes
+// ===========================================================================
 
 export interface AdvertiserDetails {
   greetingName: string;
@@ -2240,6 +29,7 @@ export interface AccountDetails {
 
 export interface AgencyDetails {
   agencyName: string;
+  shortName?: string; // e.g. "OAC" -> "OAC commission 30%"
   addressLine1: string;
   addressLine2: string;
   contactName: string;
@@ -2252,45 +42,42 @@ export interface CampaignBooking {
   referenceId: string;
   siteSizeType: string;
   type: string;
-  weeksRequired: number;
+  weeksRequired: number | string;
   startDate: string;
   endDate: string;
 }
 
 export interface ScheduleMeta {
-  locality: string;
-  cashContraLabel: string;
-  weekCommencingLabel: string;
-  bonusPlacementLabel: string;
-  reachInfoLabel: string;
-  broadcastInfoLabel: string;
+  locality: string; // cover subtitle, e.g. "Caboolture & Gold Coast Digital"
+  state: string; // default state for the placements table
   bonusNote: string;
-}
-
-export interface BillingRow {
-  flighting: string;
-  billingDate: string;
-  investment: number;
-  gst: number;
-  total: number;
-}
-
-export interface Billing {
-  attAccounts: string;
-  invoice1: string;
-  invoice2: string;
-  rows: BillingRow[];
 }
 
 export interface ExecutionParty {
   representativeName: string;
   position: string;
   date: string;
+  onBehalfOf?: string; // e.g. "Toyota / OA Collective (820MJL8IF)"
 }
 
-export interface Execution {
-  advertiser: ExecutionParty;
-  aosco: ExecutionParty;
+// One row of quote_master_data.ad_schedules
+export interface QuoteAdSchedule {
+  n?: string | null; // site name
+  fid?: string | null; // face ID -> site code
+  bonus?: boolean | null;
+  ws?: string[]; // week-start dates "dd/mm/yyyy"
+  dim?: string | null; // "12.0x3.3 m"
+  st?: string | null; // state (optional)
+  sot?: string | null;
+  mpw?: string | null;
+  ot?: string | null;
+  ct?: string | null;
+  iph?: string | null;
+  nif?: string | null;
+  r7?: string | null;
+  r28?: string | null;
+  dwell?: string | null;
+  totalWeeks?: number;
 }
 
 // The parsed shape of the quote_master_data JSON property.
@@ -2303,10 +90,8 @@ export interface QuoteMasterData {
   account?: Partial<AccountDetails>;
   agency?: Partial<AgencyDetails>;
   campaign?: Partial<CampaignBooking>;
-  ad_schedules?: Array<{ n?: string | null; fid?: string | null; ws?: string[] }>;
-  weekDates?: string[];
+  ad_schedules?: QuoteAdSchedule[];
   scheduleMeta?: Partial<ScheduleMeta>;
-  billing?: Partial<Billing>;
   specialConditions?: string[];
   execution?: {
     advertiser?: Partial<ExecutionParty>;
@@ -2319,7 +104,7 @@ export interface QuoteMasterData {
 export interface AgencyQuoteMonth {
   k: string; // month "YYYY-MM"
   w: number; // weeks booked (all schedules)
-  r: number; // client total  -> "Total (less Agency Comm)"
+  r: number; // client total  -> "Total (less agency comm)"
   a: number; // agency commission
 }
 
@@ -2344,42 +129,38 @@ export interface AgencyQuoteMasterData {
 type CrmValue = string | number | null | undefined;
 
 // Must match the keys built in hublDataTemplate at the bottom of this file.
-// Everything comes from the DEAL record only (single source of truth) —
-// the billing contact / billing company on the quote are not read.
+// Everything comes from the DEAL record only (single source of truth).
 interface HublData {
   isQuoteBlueprint: boolean;
 
-  // Deal
   dealId?: CrmValue;
   dealName?: CrmValue;
-  campaignStartDate?: CrmValue; // HubSpot date property (epoch ms or YYYY-MM-DD)
+  campaignStartDate?: CrmValue;
   campaignEndDate?: CrmValue;
-  scheduleSummaryJson?: unknown; // quote_master_data — usually a JSON string, parsed client-side below
-  agencyQuoteJson?: unknown; // agency_quote_master_data — month-wise billing, parsed client-side below
+  scheduleSummaryJson?: unknown; // quote_master_data
+  agencyQuoteJson?: unknown; // agency_quote_master_data
+  agencyDiscount?: CrmValue; // agency_discount (0.3 or 30 both mean 30%)
 
-  // Deal — agency commission rate shown in the billing table header
-  agencyDiscount?: CrmValue; // agency_discount (0.1 or 10 both mean 10%)
+  // actualMarketRate - discount - agency commission = investment
+  // investment + gstAmount = totalInvestment
+  actualMarketRate?: CrmValue; // total_bill_amount_before_discount_total_market_rate (before all discounts)
+  investment?: CrmValue; // total_commercial_rate (ex GST, after discount and agency commission)
+  gstAmount?: CrmValue;
+  totalInvestment?: CrmValue;
 
-  // Deal — billing amounts (fallback when agency_quote_master_data is empty)
-  investment?: CrmValue; // total_commercial_rate (ex GST)
-  gstAmount?: CrmValue; // gst_amount
-  totalInvestment?: CrmValue; // total_investment (incl GST)
+  advertiserCompany?: CrmValue;
+  advertiserFirstName?: CrmValue;
+  advertiserLastName?: CrmValue;
+  advertiserPhone?: CrmValue;
+  advertiserEmail?: CrmValue;
 
-  // Deal — advertiser (also used for Account Details: same person)
-  advertiserCompany?: CrmValue; // advertiser_company
-  advertiserFirstName?: CrmValue; // advertiser_contact_first_name
-  advertiserLastName?: CrmValue; // advertiser_contact_last_name
-  advertiserPhone?: CrmValue; // advertiser_person_phone_number
-  advertiserEmail?: CrmValue; // advertiser_person_email_address
-
-  // Deal — agency (a different person)
-  agencyCompanyName?: CrmValue; // agency_company_name
-  agencyFirstName?: CrmValue; // agency_person_first_name
-  agencyLastName?: CrmValue; // agency_person_last_name
-  agencyEmail?: CrmValue; // agency_person_email
-  agencyPhone?: CrmValue; // agency_person_phone
-  agencyAddress?: CrmValue; // agency_company_address
-  agencyAddressLine2?: CrmValue; // agency_address_line_2
+  agencyCompanyName?: CrmValue;
+  agencyFirstName?: CrmValue;
+  agencyLastName?: CrmValue;
+  agencyEmail?: CrmValue;
+  agencyPhone?: CrmValue;
+  agencyAddress?: CrmValue;
+  agencyAddressLine2?: CrmValue;
 }
 
 interface Props {
@@ -2389,49 +170,45 @@ interface Props {
 
 interface FieldValues {}
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
+// ===========================================================================
+// Constants
+// ===========================================================================
+
+const LOGO_SRC =
+  "https://443453524.fs1.hubspotusercontent-ap1.net/hubfs/443453524/logo.png";
+// Cover photo. Swap for the billboard photo once it's uploaded to File Manager.
+const HERO_IMAGE_SRC =
+  "https://443453524.fs1.hubspotusercontent-ap1.net/hubfs/443453524/Quote%20Cover.png";
+
+const GST_RATE = 0.1;
+const DEFAULT_COMMISSION_RATE = 0.1; // only when agency_discount is empty and nothing can be derived
+const NETWORK_SITE_COUNT = 18; // every site on the AOSco network
+const MAX_GRID_WEEKS = 26; // cap when stretching the grid to the deal start/end dates
+const DEFAULT_STATE = "QLD";
+const DEFAULT_TYPE = "Digital billboards";
+const FORMAT_WORD = "Digital";
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+const WEEK_MS = 7 * DAY_MS;
+
+const MONTHS_SHORT = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const MONTHS_UPPER = MONTHS_SHORT.map((m) => m.toUpperCase());
+const FULL_MONTHS = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December",
+];
+const WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+
+// ===========================================================================
+// Generic helpers
+// ===========================================================================
 
 function pad2(n: number): string {
   return String(n).padStart(2, "0");
 }
 
-// Formats a HubSpot deal date property (campaign_start_date etc.) as
-// dd/mm/yyyy. HubSpot sends these as Australian day-first dates with a
-// two- or four-digit year: "1/9/26", "01/09/26", "01/09/2026" -> "01/09/2026".
-// Two-digit years are read as 20xx. Also accepts epoch timestamps and
-// ISO "2026-09-01" in case the property format ever changes.
-function formatHubspotDate(value: CrmValue): string {
-  if (value === null || value === undefined) return "";
-  const raw = String(value).trim();
-  if (!raw) return "";
-
-  // d/m/yy, dd/mm/yy, d/m/yyyy, dd/mm/yyyy (optionally followed by a time)
-  const dmy = raw.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2}|\d{4})(?!\d)/);
-  if (dmy) {
-    const day = Number(dmy[1]);
-    const month = Number(dmy[2]);
-    const year = dmy[3].length === 2 ? 2000 + Number(dmy[3]) : Number(dmy[3]);
-    if (month < 1 || month > 12 || day < 1 || day > 31) return "";
-    return `${pad2(day)}/${pad2(month)}/${year}`;
-  }
-
-  // ISO "2026-09-01"
-  const ymd = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
-  if (ymd) return `${ymd[3]}/${ymd[2]}/${ymd[1]}`;
-
-  // Epoch ms / seconds, including "1788220800000.0" and "1.7882208E12"
-  if (/^\d+(\.\d+)?(e\+?\d+)?$/i.test(raw)) {
-    const n = Number(raw);
-    let date: Date | null = null;
-    if (n > 1e11) date = new Date(n);
-    else if (n > 1e8) date = new Date(n * 1000);
-    if (!date || Number.isNaN(date.getTime())) return "";
-    return `${pad2(date.getUTCDate())}/${pad2(date.getUTCMonth() + 1)}/${date.getUTCFullYear()}`;
-  }
-
-  return ""; // unknown format: show nothing rather than a wrong date
+function cx(...classes: Array<string | false | null | undefined>): string {
+  return classes.filter(Boolean).join(" ");
 }
 
 // Returns the first value that isn't null/undefined/blank, as a string.
@@ -2444,28 +221,68 @@ function firstFilled(...values: CrmValue[]): string {
   return "";
 }
 
-// "Jane", "Smith" -> "Jane Smith"; skips blanks.
 function fullName(first: CrmValue, last: CrmValue): string {
-  return [first, last]
-    .map((v) => firstFilled(v))
-    .filter(Boolean)
-    .join(" ");
+  return [first, last].map((v) => firstFilled(v)).filter(Boolean).join(" ");
 }
 
-function formatCurrency(value: number | string | null | undefined): string {
+function uniq<T>(items: T[]): T[] {
+  return [...new Set(items)];
+}
+
+function plural(n: number, word: string): string {
+  return `${n} ${word}${n === 1 ? "" : "s"}`;
+}
+
+// "a", "a and b", "a, b and c"
+function joinAnd(items: string[]): string {
+  if (items.length <= 1) return items.join("");
+  return `${items.slice(0, -1).join(", ")} and ${items[items.length - 1]}`;
+}
+
+function round2(n: number): number {
+  return Math.round((n + Number.EPSILON) * 100) / 100;
+}
+
+// "4000", "4,000.00", "$4,000.00", 4000 -> 4000; blank/unreadable -> null.
+function toAmount(value: CrmValue): number | null {
+  if (value === null || value === undefined) return null;
+  const s = String(value).replace(/[^0-9.-]/g, "");
+  if (s === "" || s === "-" || s === ".") return null;
+  const n = Number(s);
+  return Number.isFinite(n) ? n : null;
+}
+
+// "0.3", "30", "30%" -> 0.3. Values above 1 are read as a percentage.
+function toRate(value: CrmValue): number | null {
+  const n = toAmount(value);
+  if (n === null || n < 0) return null;
+  return n > 1 ? n / 100 : n;
+}
+
+// 0.3 -> "30%", 0.1111 -> "11.11%"
+function formatRate(rate: number): string {
+  return `${Number((rate * 100).toFixed(2))}%`;
+}
+
+function formatCurrency(value: number, dropZeroCents = false): string {
   const n = Number(value);
   if (!Number.isFinite(n)) return "$0.00";
+  const whole = dropZeroCents && Number.isInteger(round2(n));
   return n.toLocaleString("en-AU", {
     style: "currency",
     currency: "AUD",
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
+    minimumFractionDigits: whole ? 0 : 2,
+    maximumFractionDigits: whole ? 0 : 2,
   });
 }
 
-// JSON deal properties can reach us in a few shapes depending on how HubL
-// serialises them: a JSON string (normal), an already-parsed object, an
-// HTML-escaped string (&quot;…), or a double-encoded JSON string.
+const money = (n: number | null | undefined) =>
+  n === null || n === undefined ? "\u2014" : formatCurrency(n);
+const negativeMoney = (n: number | null | undefined) =>
+  n === null || n === undefined ? "\u2014" : `\u2013${formatCurrency(Math.abs(n))}`;
+
+// JSON deal properties can arrive as a JSON string, an object, an
+// HTML-escaped string (&quot;…) or a double-encoded JSON string.
 function parseJsonProperty<T extends object>(raw: unknown): Partial<T> {
   if (!raw) return {};
   if (typeof raw === "object") return raw as Partial<T>;
@@ -2473,7 +290,7 @@ function parseJsonProperty<T extends object>(raw: unknown): Partial<T> {
   const tryParse = (text: string): unknown => {
     try {
       let parsed: unknown = JSON.parse(text);
-      if (typeof parsed === "string") parsed = JSON.parse(parsed); // double-encoded
+      if (typeof parsed === "string") parsed = JSON.parse(parsed);
       return parsed;
     } catch {
       return null;
@@ -2491,188 +308,56 @@ function parseJsonProperty<T extends object>(raw: unknown): Partial<T> {
       .replace(/&amp;/g, "&");
     parsed = tryParse(decoded);
   }
-  return typeof parsed === "object" && parsed !== null
-    ? (parsed as Partial<T>)
-    : {};
+  return typeof parsed === "object" && parsed !== null ? (parsed as Partial<T>) : {};
 }
 
-function parseQuoteMasterData(raw: unknown): QuoteMasterData {
-  return parseJsonProperty<QuoteMasterData>(raw) as QuoteMasterData;
+// ===========================================================================
+// Date helpers (all UTC ms, so no timezone drift)
+// ===========================================================================
+
+interface DateParts {
+  day: number;
+  month: number; // 1-12
+  year: number;
 }
 
-function parseAgencyQuoteMasterData(raw: unknown): AgencyQuoteMasterData {
-  return parseJsonProperty<AgencyQuoteMasterData>(raw) as AgencyQuoteMasterData;
+function toDateParts(time: number): DateParts {
+  const d = new Date(time);
+  return { day: d.getUTCDate(), month: d.getUTCMonth() + 1, year: d.getUTCFullYear() };
 }
 
-function cx(...classes: Array<string | false | null | undefined>): string {
-  return classes.filter(Boolean).join(" ");
-}
+// HubSpot deal date -> "dd/mm/yyyy". Handles "1/9/26", "01/09/2026",
+// ISO "2026-09-01" and epoch ms/seconds.
+function formatHubspotDate(value: CrmValue): string {
+  if (value === null || value === undefined) return "";
+  const raw = String(value).trim();
+  if (!raw) return "";
 
-// ---------------------------------------------------------------------------
-// Billing helpers
-// ---------------------------------------------------------------------------
-
-// Month labels in the style used on the printed agreement ("SEPT – NOV").
-const FLIGHT_MONTHS = [
-  "JAN",
-  "FEB",
-  "MAR",
-  "APR",
-  "MAY",
-  "JUNE",
-  "JULY",
-  "AUG",
-  "SEPT",
-  "OCT",
-  "NOV",
-  "DEC",
-];
-const FULL_MONTHS = [
-  "January",
-  "February",
-  "March",
-  "April",
-  "May",
-  "June",
-  "July",
-  "August",
-  "September",
-  "October",
-  "November",
-  "December",
-];
-
-const GST_RATE = 0.1;
-const DEFAULT_COMMISSION_RATE = 0.1; // only used when deal.agency_discount is empty
-
-function ordinalSuffix(day: number): string {
-  const mod100 = day % 100;
-  if (mod100 >= 11 && mod100 <= 13) return "th";
-  switch (day % 10) {
-    case 1:
-      return "st";
-    case 2:
-      return "nd";
-    case 3:
-      return "rd";
-    default:
-      return "th";
+  const dmy = raw.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2}|\d{4})(?!\d)/);
+  if (dmy) {
+    const day = Number(dmy[1]);
+    const month = Number(dmy[2]);
+    const year = dmy[3].length === 2 ? 2000 + Number(dmy[3]) : Number(dmy[3]);
+    if (month < 1 || month > 12 || day < 1 || day > 31) return "";
+    return `${pad2(day)}/${pad2(month)}/${year}`;
   }
-}
 
-// Today's date in Queensland time, so a quote generated on a UTC server
-// late in the Australian evening still shows the Australian date.
-function todayInBrisbane(): { day: number; month: number; year: number } {
-  try {
-    const parts = new Intl.DateTimeFormat("en-AU", {
-      timeZone: "Australia/Brisbane",
-      day: "numeric",
-      month: "numeric",
-      year: "numeric",
-    }).formatToParts(new Date());
-    const get = (type: string) =>
-      Number(parts.find((p) => p.type === type)?.value);
-    const day = get("day");
-    const month = get("month");
-    const year = get("year");
-    if (day && month && year) return { day, month, year };
-  } catch {
-    // Intl timeZone not supported — fall through to local time.
+  const ymd = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (ymd) return `${ymd[3]}/${ymd[2]}/${ymd[1]}`;
+
+  if (/^\d+(\.\d+)?(e\+?\d+)?$/i.test(raw)) {
+    const n = Number(raw);
+    let date: Date | null = null;
+    if (n > 1e11) date = new Date(n);
+    else if (n > 1e8) date = new Date(n * 1000);
+    if (!date || Number.isNaN(date.getTime())) return "";
+    return `${pad2(date.getUTCDate())}/${pad2(date.getUTCMonth() + 1)}/${date.getUTCFullYear()}`;
   }
-  const now = new Date();
-  return {
-    day: now.getDate(),
-    month: now.getMonth() + 1,
-    year: now.getFullYear(),
-  };
+
+  return "";
 }
 
-// "4000", "4,000.00", "$4,000.00", 4000 -> 4000; blank/unreadable -> null.
-function toAmount(value: CrmValue): number | null {
-  if (value === null || value === undefined) return null;
-  const s = String(value).replace(/[^0-9.-]/g, "");
-  if (s === "" || s === "-" || s === ".") return null;
-  const n = Number(s);
-  return Number.isFinite(n) ? n : null;
-}
-
-// Rounds to cents, avoiding float drift (1.005 -> 1.01).
-function round2(n: number): number {
-  return Math.round((n + Number.EPSILON) * 100) / 100;
-}
-
-// 0.1111 -> "11.1%", 0.1 -> "10%".
-function formatRate(rate: number): string {
-  return `${Number((rate * 100).toFixed(2))}%`;
-}
-
-// deal.agency_discount as a fraction: "0.1", "10", "10%" -> 0.1.
-// Values above 1 are read as a percentage. Blank/unreadable -> null.
-function toRate(value: CrmValue): number | null {
-  const n = toAmount(value);
-  if (n === null || n < 0) return null;
-  return n > 1 ? n / 100 : n;
-}
-
-interface AgencyBillingRow {
-  key: string; // "2026-09"
-  flighting: string; // "SEPT 2026"
-  billingDay: number; // last day of the month (EOM)
-  billingMonth: number; // 1-12
-  billingYear: number;
-  investment: number; // r + a
-  commission: number; // a
-  net: number; // r
-  gst: number; // 10% of net (Total less Agency Comm)
-  total: number; // net + GST
-}
-
-// One billing row per month in agency_quote_master_data.m, oldest first.
-// Months that can't be read are left out.
-function toAgencyBillingRows(data: AgencyQuoteMasterData): AgencyBillingRow[] {
-  const months = Array.isArray(data.m) ? data.m : [];
-
-  return months
-    .map((m): AgencyBillingRow | null => {
-      const match = /^(\d{4})-(\d{2})$/.exec(String(m?.k ?? ""));
-      if (!match) return null;
-
-      const year = Number(match[1]);
-      const month = Number(match[2]);
-      if (month < 1 || month > 12) return null;
-
-      const net = round2(Number(m.r) || 0);
-      const commission = round2(Number(m.a) || 0);
-      const investment = round2(net + commission);
-      const gst = round2(net * GST_RATE); // GST is on the amount after agency commission
-      const total = round2(net + gst);
-
-      return {
-        key: match[0],
-        flighting: `${FLIGHT_MONTHS[month - 1]} ${year}`,
-        billingDay: new Date(Date.UTC(year, month, 0)).getUTCDate(), // day 0 of next month = EOM
-        billingMonth: month,
-        billingYear: year,
-        investment,
-        commission,
-        net,
-        gst,
-        total,
-      };
-    })
-    .filter((row): row is AgencyBillingRow => row !== null)
-    .sort((x, y) => x.key.localeCompare(y.key));
-}
-
-// ---------------------------------------------------------------------------
-// Campaign Booking helpers (rules confirmed by the client)
-// ---------------------------------------------------------------------------
-
-// A network buy uses every site on the AOSco network.
-const NETWORK_SITE_COUNT = 18;
-const DAY_MS = 24 * 60 * 60 * 1000;
-
-// "15/09/2026" or "2026-09-15" (optionally with a time) -> UTC ms; else null.
+// "15/09/2026" or "2026-09-15" -> UTC ms; else null.
 function toDayMs(value: unknown): number | null {
   const s = String(value ?? "").trim();
   const dmy = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
@@ -2682,273 +367,328 @@ function toDayMs(value: unknown): number | null {
   return null;
 }
 
-// "Site, Size & Type of Selected Billboards":
-//   all 18 sites on the schedule -> "NETWORK"
-//   otherwise                    -> how many billboards are itemised ("3 SITES")
-// Each billboard is counted once (by face ID, else by name). Reads
-// quote_master_data.ad_schedules, falling back to agency_quote_master_data.
-function siteSizeTypeLabel(
+function parseDealDate(value: CrmValue): number | null {
+  return toDayMs(formatHubspotDate(value));
+}
+
+function formatDmy(t: number): string {
+  const p = toDateParts(t);
+  return `${pad2(p.day)}/${pad2(p.month)}/${p.year}`;
+}
+
+// "1 Feb"
+function dayMonth(t: number): string {
+  const p = toDateParts(t);
+  return `${p.day} ${MONTHS_SHORT[p.month - 1]}`;
+}
+
+// "15 Mar 2027"
+function dayMonthYear(t: number): string {
+  return `${dayMonth(t)} ${toDateParts(t).year}`;
+}
+
+// "Feb – Mar 2027", "Oct 2026 – Jan 2027", "Mar 2027"
+function monthRangeLabel(from: number | null, to: number | null): string {
+  const a0 = from ?? to;
+  const b0 = to ?? from;
+  if (a0 === null || b0 === null) return "";
+  const a = toDateParts(a0);
+  const b = toDateParts(b0);
+  const ma = MONTHS_SHORT[a.month - 1];
+  const mb = MONTHS_SHORT[b.month - 1];
+  if (a.year !== b.year) return `${ma} ${a.year} \u2013 ${mb} ${b.year}`;
+  if (a.month !== b.month) return `${ma} \u2013 ${mb} ${b.year}`;
+  return `${ma} ${b.year}`;
+}
+
+// "MAR-2027"
+function flightMonthLabel(t: number): string {
+  const p = toDateParts(t);
+  return `${MONTHS_UPPER[p.month - 1]}-${p.year}`;
+}
+
+function monthKey(t: number): string {
+  const p = toDateParts(t);
+  return `${p.year}-${pad2(p.month)}`;
+}
+
+// Billed monthly: the last day of the month containing t (EOM).
+function billingDateFor(t: number): DateParts {
+  const p = toDateParts(t);
+  return toDateParts(Date.UTC(p.year, p.month, 0));
+}
+
+function ordinalSuffix(day: number): string {
+  const mod100 = day % 100;
+  if (mod100 >= 11 && mod100 <= 13) return "th";
+  switch (day % 10) {
+    case 1: return "st";
+    case 2: return "nd";
+    case 3: return "rd";
+    default: return "th";
+  }
+}
+
+// "22nd MAY 2027"
+function billingDateLabel(p: DateParts | null): string {
+  if (!p) return "\u00A0";
+  return `${p.day}${ordinalSuffix(p.day)} ${FULL_MONTHS[p.month - 1].toUpperCase()} ${p.year}`;
+}
+
+// ===========================================================================
+// Sites (merges quote_master_data.ad_schedules with agency_quote_master_data.s)
+// ===========================================================================
+
+interface SiteRow {
+  key: string;
+  code: string; // face ID
+  name: string; // display name
+  locality: string; // "Caboolture" from "Caboolture – 66 Morayfield Rd"
+  bonus: boolean;
+  size: string; // "12.0 x 3.3 m"
+  state: string;
+  weeks: number[]; // sorted, unique week-start dates (UTC ms)
+  netPerWeek: number; // client rate (after agency commission)
+  commissionPerWeek: number;
+}
+
+const MONTH_WORD = "(?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*";
+const PERIOD_PREFIX = new RegExp(`^${MONTH_WORD}\\s*[-\u2013]\\s*${MONTH_WORD}\\s+[-\u2013]\\s+`, "i");
+
+// "Oct-Jan - BONUS NEWMARKET LANDSCAPE" -> "NEWMARKET LANDSCAPE"
+function cleanSiteName(raw: string): string {
+  const cleaned = raw
+    .replace(PERIOD_PREFIX, "")
+    .replace(/^bonus\s+/i, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  return cleaned || raw.trim();
+}
+
+// "Caboolture – 66 Morayfield Rd" -> "Caboolture"; no separator -> ""
+function siteLocality(name: string): string {
+  const parts = name.split(/\s+[\u2013-]\s+/);
+  return parts.length > 1 ? parts[0].trim() : "";
+}
+
+const normName = (v: unknown) => String(v ?? "").replace(/\s+/g, " ").trim().toLowerCase();
+
+function uniqueSortedDays(list: unknown[]): number[] {
+  return uniq(list.map(toDayMs).filter((t): t is number => t !== null)).sort((a, b) => a - b);
+}
+
+function makeSiteRow(
+  q: QuoteAdSchedule | null,
+  s: AgencyQuoteSchedule | null,
+  index: number,
+  defaultState: string,
+): SiteRow {
+  const rawName = firstFilled(q?.n, s?.n);
+  const name = cleanSiteName(rawName);
+
+  const agencyDates = s?.d;
+  const quoteDates = q?.ws;
+  const fromAgency = uniqueSortedDays(Array.isArray(agencyDates) ? agencyDates : []);
+  const weeks = fromAgency.length
+    ? fromAgency
+    : uniqueSortedDays(Array.isArray(quoteDates) ? quoteDates : []);
+
+  const net = Number(s?.r) || 0;
+  const commission = Number(s?.a) || 0;
+  const bonus =
+    typeof q?.bonus === "boolean"
+      ? q.bonus
+      : s
+        ? net === 0 && commission === 0
+        : /\bbonus\b/i.test(rawName);
+
+  return {
+    key: String(index),
+    code: firstFilled(q?.fid).replace(/\.0+$/, ""),
+    name,
+    locality: siteLocality(name),
+    bonus,
+    size: firstFilled(q?.dim).replace(/\s*x\s*/i, " x "),
+    state: firstFilled(q?.st, defaultState),
+    weeks,
+    netPerWeek: bonus ? 0 : net,
+    commissionPerWeek: bonus ? 0 : commission,
+  };
+}
+
+function buildSites(
   data: QuoteMasterData,
   agencyData: AgencyQuoteMasterData,
-): string {
+  defaultState: string,
+): SiteRow[] {
   const quoteRows = Array.isArray(data.ad_schedules) ? data.ad_schedules : [];
   const agencyRows = Array.isArray(agencyData.s) ? agencyData.s : [];
-  const keys =
-    quoteRows.length > 0
-      ? quoteRows.map((r) => firstFilled(r?.fid, r?.n))
-      : agencyRows.map((r) => firstFilled(r?.n));
 
-  const count = new Set(
-    keys.map((k) => k.replace(/\s+/g, " ").toLowerCase()).filter(Boolean),
-  ).size;
-  if (count === 0) return "";
-  if (count >= NETWORK_SITE_COUNT) return "NETWORK";
-  return `${count} ${count === 1 ? "SITE" : "SITES"}`;
-}
-
-// "Weeks Required": one number for the whole campaign length — every week
-// from the first booked week to the last, paid AND bonus, counted once.
-// Week dates come from agency_quote_master_data (d), else quote_master_data
-// (ws); with no schedule it falls back to the deal's start/end dates.
-function campaignWeeks(
-  data: QuoteMasterData,
-  agencyData: AgencyQuoteMasterData,
-  startDate: string,
-  endDate: string,
-): number {
-  const collect = (lists: unknown[][]) =>
-    lists
-      .flat()
-      .map(toDayMs)
-      .filter((t): t is number => t !== null);
-
-  let times = collect(
-    (Array.isArray(agencyData.s) ? agencyData.s : []).map((r) =>
-      Array.isArray(r?.d) ? r.d : [],
-    ),
-  );
-  if (times.length === 0) {
-    times = collect(
-      (Array.isArray(data.ad_schedules) ? data.ad_schedules : []).map((r) =>
-        Array.isArray(r?.ws) ? r.ws : [],
-      ),
-    );
+  if (quoteRows.length === 0) {
+    return agencyRows.map((s, i) => makeSiteRow(null, s, i, defaultState));
   }
 
-  if (times.length > 0) {
-    const span = Math.max(...times) - Math.min(...times);
-    return Math.round(span / (7 * DAY_MS)) + 1;
+  const agencyByName = new Map<string, AgencyQuoteSchedule>();
+  for (const s of agencyRows) {
+    const k = normName(s?.n);
+    if (k && !agencyByName.has(k)) agencyByName.set(k, s);
+  }
+  return quoteRows.map((q, i) =>
+    makeSiteRow(q, agencyByName.get(normName(q?.n)) ?? null, i, defaultState),
+  );
+}
+
+// Continuous weekly columns covering every booked week, stretched to the
+// deal's start/end dates (e.g. WK1 = 1 Feb even if nothing runs that week).
+function buildWeekColumns(
+  bookedTimes: number[],
+  campaignStart: number | null,
+  campaignEnd: number | null,
+): number[] {
+  if (bookedTimes.length === 0) return [];
+  const first = Math.min(...bookedTimes);
+  const last = Math.max(...bookedTimes);
+
+  let start = first;
+  if (campaignStart !== null && campaignStart < first) {
+    start = first - Math.ceil((first - campaignStart) / WEEK_MS) * WEEK_MS;
+  }
+  let end = last;
+  const lastWeekEnd = last + 6 * DAY_MS;
+  if (campaignEnd !== null && campaignEnd > lastWeekEnd) {
+    end = last + Math.ceil((campaignEnd - lastWeekEnd) / WEEK_MS) * WEEK_MS;
   }
 
-  const start = toDayMs(startDate);
-  const end = toDayMs(endDate);
-  if (start !== null && end !== null && end >= start) {
-    return Math.ceil((Math.round((end - start) / DAY_MS) + 1) / 7);
+  let count = Math.floor((end - start) / WEEK_MS) + 1;
+  if (count > MAX_GRID_WEEKS) {
+    start = first; // bad deal dates: show only the booked range
+    count = Math.floor((last - first) / WEEK_MS) + 1;
   }
-  return 0;
+  return Array.from({ length: count }, (_, i) => start + i * WEEK_MS);
 }
 
-// ---------------------------------------------------------------------------
-// Default data
-// ---------------------------------------------------------------------------
-
-const DEFAULT_ADVERTISER: AdvertiserDetails = {
-  greetingName: "Nic",
-  companyName: "",
-  contactName: "",
-  phone: "",
-  email: "",
-  address: "",
-};
-const DEFAULT_ACCOUNT: AccountDetails = {
-  accountsName: "",
-  accountsProcess: "Please send to Nic for distribution and payment",
-  accountsEmail: "",
-};
-const DEFAULT_CAMPAIGN: CampaignBooking = {
-  campaignName: "",
-  referenceId: "AOS-",
-  siteSizeType: "NETWORK",
-  type: "",
-  weeksRequired: 0,
-  startDate: "",
-  endDate: "",
-};
-const DEFAULT_EXECUTION: Execution = {
-  advertiser: { representativeName: "", position: "Owner", date: "" },
-  aosco: {
-    representativeName: "Jesse McIntyre",
-    position: "Sales Director",
-    date: "",
-  },
-};
-
-// Transcribed verbatim, including the source document's own numbering.
-const DEFAULT_SPECIAL_CONDITIONS: string[] = [
-  "Unlimited Material Changes / Uploads Included.",
-  "CANCELLATION (COVID Consideration) - AOSco agrees to honour a 7-day cancellation deadline, effective up until Monday before campaign launch in writing.",
-  "Execution - I acknowledge that I have received and read this Agreement, confirm that the details contained within (including regarding payments due) are correct and hereby agree to be bound to this Agreement and the Terms and Conditions as attached.",
-  "AOSco will offer Bonus STA Sites to the same spec if we have the avails.",
-  "Bonus offered in this campaign is placed as 100% Guaranteed Bonus",
-  "AOSCO will allocate Photographer resources to capture Creative for Client Socials. Drone, Static, Video",
-  "Discount applied of 10% on Total for up for payment.",
-];
-
-// ---------------------------------------------------------------------------
-// Small presentational pieces
-// ---------------------------------------------------------------------------
-
-interface FieldLineProps {
-  label: string;
-  value?: string | number | null;
-  underline?: boolean;
+function monthGroups(weeks: number[]): Array<{ key: string; label: string; span: number }> {
+  const groups: Array<{ key: string; label: string; span: number; month: number; year: number }> = [];
+  for (const w of weeks) {
+    const p = toDateParts(w);
+    const key = `${p.year}-${p.month}`;
+    const last = groups[groups.length - 1];
+    if (last && last.key === key) last.span += 1;
+    else groups.push({ key, label: "", span: 1, month: p.month, year: p.year });
+  }
+  return groups.map((g) => ({
+    key: g.key,
+    span: g.span,
+    label:
+      g.span >= 3
+        ? `${FULL_MONTHS[g.month - 1].toUpperCase()} ${g.year}`
+        : `${MONTHS_UPPER[g.month - 1]} ${String(g.year).slice(2)}`,
+  }));
 }
 
-function FieldLine({ label, value, underline = true }: FieldLineProps) {
-  return (
-    <div className="aosco-field-row">
-      <span className="aosco-field-label">{label}</span>
-      <span
-        className={cx(
-          "aosco-field-value",
-          underline && "aosco-field-value--underline",
-        )}
-      >
-        {value || "\u00A0"}
-      </span>
-    </div>
-  );
+// ===========================================================================
+// Billing — one row per flighting month, billed monthly at EOM
+// ===========================================================================
+
+interface BillingRowCalc {
+  key: string;
+  flighting: string; // "MAR-2027"
+  billing: DateParts | null;
+  investment: number; // before agency commission
+  commission: number;
+  net: number; // "Total (less agency comm)"
+  gst: number;
+  total: number; // net + GST
 }
 
-// ---------------------------------------------------------------------------
-// Billing table
-// ---------------------------------------------------------------------------
-
-const money = (n: number | null) => (n !== null ? formatCurrency(n) : "\u00A0");
-
-// "30th SEPTEMBER 2026"
-function BillingDate({
-  day,
-  month,
-  year,
-}: {
-  day: number;
-  month: number;
-  year: number;
-}) {
-  return (
-    <>
-      {day}
-      <sup>{ordinalSuffix(day)}</sup> {FULL_MONTHS[month - 1].toUpperCase()}{" "}
-      {year}
-    </>
-  );
+interface MoneyTotals {
+  investment: number;
+  commission: number;
+  net: number;
+  gst: number;
+  total: number;
 }
 
-function BillingColumns() {
-  return (
-    <colgroup>
-      <col style={{ width: "15%" }} />
-      <col style={{ width: "16%" }} />
-      <col style={{ width: "13%" }} />
-      <col style={{ width: "14%" }} />
-      <col style={{ width: "13%" }} />
-      <col style={{ width: "12%" }} />
-      <col style={{ width: "17%" }} />
-    </colgroup>
-  );
+function toBillingRow(key: string, flighting: string, billing: DateParts | null, netRaw: number, commissionRaw: number): BillingRowCalc {
+  const net = round2(netRaw);
+  const commission = round2(commissionRaw);
+  const gst = round2(net * GST_RATE); // GST is on the amount after agency commission
+  return {
+    key,
+    flighting,
+    billing,
+    investment: round2(net + commission),
+    commission,
+    net,
+    gst,
+    total: round2(net + gst),
+  };
 }
 
-function BillingHead({ commissionLabel }: { commissionLabel: string }) {
-  return (
-    <thead>
-      <tr>
-        <th className={cx("aosco-billing-cell", "aosco-billing-head")}>
-          Flighting Dates
-        </th>
-        <th className={cx("aosco-billing-cell", "aosco-billing-head")}>
-          Billing Cycle 45
-          <br />
-          days EOM
-        </th>
-        <th className={cx("aosco-billing-cell", "aosco-billing-head")}>
-          Advertising
-          <br />
-          Investment
-        </th>
-        <th className={cx("aosco-billing-cell", "aosco-billing-head")}>
-          Agency
-          <br />
-          Commission
-          <br />({commissionLabel})
-        </th>
-        <th className={cx("aosco-billing-cell", "aosco-billing-head")}>
-          Total
-          <br />
-          <span className="italic">
-            (less
-            <br />
-            Agency
-            <br />
-            Comm
-          </span>
-          )
-        </th>
-        <th className={cx("aosco-billing-cell", "aosco-billing-head")}>
-          plus
-          <br />
-          GST 10%
-        </th>
-        <th className={cx("aosco-billing-cell", "aosco-billing-head")}>
-          Total Due to
-          <br />
-          AOSco
-          <br />
-          <span className="italic">incl</span> GST
-        </th>
-      </tr>
-    </thead>
-  );
+// Uses agency_quote_master_data.m (month totals); if that's missing, sums the
+// paid weeks per month from the site rows. Months with nothing to bill are skipped.
+function monthlyBillingRows(agencyData: AgencyQuoteMasterData, sites: SiteRow[]): BillingRowCalc[] {
+  const byMonth = new Map<string, { net: number; commission: number }>();
+  const add = (k: string, net: number, commission: number) => {
+    const cur = byMonth.get(k) ?? { net: 0, commission: 0 };
+    cur.net += net;
+    cur.commission += commission;
+    byMonth.set(k, cur);
+  };
+
+  const months = Array.isArray(agencyData.m) ? agencyData.m : [];
+  if (months.length > 0) {
+    for (const m of months) {
+      const k = String(m?.k ?? "");
+      if (/^\d{4}-\d{2}$/.test(k)) add(k, Number(m.r) || 0, Number(m.a) || 0);
+    }
+  } else {
+    for (const s of sites) {
+      if (s.bonus) continue;
+      for (const t of s.weeks) add(monthKey(t), s.netPerWeek, s.commissionPerWeek);
+    }
+  }
+
+  return [...byMonth.entries()]
+    .filter(([, v]) => v.net + v.commission > 0)
+    .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+    .map(([k, v]) => {
+      const [y, mo] = k.split("-").map(Number);
+      const t = Date.UTC(y, mo - 1, 1);
+      return toBillingRow(k, flightMonthLabel(t), billingDateFor(t), v.net, v.commission);
+    });
 }
 
-interface BillingTableProps {
-  agencyData?: AgencyQuoteMasterData; // month-wise rows (preferred)
-  agencyDiscount?: CrmValue; // deal.agency_discount — commission % in the header
+// Single row from the deal totals, when there's no agency quote data.
+// investment is after agency commission; commission is a % of the market rate.
+function dealBillingRows(
+  investmentValue: CrmValue,
+  marketRate: number | null,
+  rate: number,
+  startMs: number | null,
+  endMs: number | null,
+): BillingRowCalc[] {
+  const net = toAmount(investmentValue);
+  if (net === null) return [];
+  const commission = marketRate !== null ? marketRate * rate : rate < 1 ? (net * rate) / (1 - rate) : 0;
 
-  // Fallback single row, used only when agency_quote_master_data is empty
-  campaignStartDate?: CrmValue;
-  campaignEndDate?: CrmValue;
-  investment?: CrmValue; // ex GST, before commission
-  agencyCommission?: CrmValue; // optional — if empty, 10% of investment is used
-  gstAmount?: CrmValue;
-  totalInvestment?: CrmValue; // incl GST
+  let flighting = "";
+  if (startMs !== null && endMs !== null) {
+    const a = flightMonthLabel(startMs);
+    const b = flightMonthLabel(endMs);
+    flighting = a === b ? a : `${a} \u2013 ${b}`;
+  } else if (startMs !== null || endMs !== null) {
+    flighting = flightMonthLabel((startMs ?? endMs) as number);
+  }
+  const billFrom = endMs ?? startMs;
+  return [
+    toBillingRow("deal", flighting, billFrom !== null ? billingDateFor(billFrom) : null, net, commission),
+  ];
 }
 
-function BillingTable(props: BillingTableProps) {
-  const rows = props.agencyData ? toAgencyBillingRows(props.agencyData) : [];
-  const commissionRate = toRate(props.agencyDiscount) ?? DEFAULT_COMMISSION_RATE;
-  const commissionLabel = formatRate(commissionRate);
-
-  return rows.length > 0 ? (
-    <MonthlyBillingTable rows={rows} commissionLabel={commissionLabel} />
-  ) : (
-    <SingleRowBillingTable
-      {...props}
-      commissionRate={commissionRate}
-      commissionLabel={commissionLabel}
-    />
-  );
-}
-
-// One row per month from agency_quote_master_data, plus a Campaign Total row.
-function MonthlyBillingTable({
-  rows,
-  commissionLabel,
-}: {
-  rows: AgencyBillingRow[];
-  commissionLabel: string;
-}) {
-  const totals = rows.reduce(
+function sumRows(rows: BillingRowCalc[]): MoneyTotals | null {
+  if (rows.length === 0) return null;
+  return rows.reduce<MoneyTotals>(
     (t, r) => ({
       investment: round2(t.investment + r.investment),
       commission: round2(t.commission + r.commission),
@@ -2958,41 +698,209 @@ function MonthlyBillingTable({
     }),
     { investment: 0, commission: 0, net: 0, gst: 0, total: 0 },
   );
+}
+
+// ===========================================================================
+// Default copy
+// ===========================================================================
+
+const DEFAULT_EXECUTION = {
+  advertiser: { representativeName: "", position: "Director", date: "" },
+  aosco: { representativeName: "Jesse McIntyre", position: "Sales Director", date: "" },
+};
+
+function defaultSpecialConditions(agencyName: string): string[] {
+  const list = [
+    "Unlimited material changes / uploads included.",
+    "Billed monthly, at the end of each flighting month (EOM).",
+    "Cancellation (COVID consideration): AOSco agrees to honour a 7-day cancellation deadline, effective up until the Monday before campaign launch, in writing.",
+    "AOSco will offer bonus STA sites to the same spec if we have the avails.",
+    "Bonus offered in this campaign is placed STA.",
+  ];
+  if (agencyName) {
+    list.push(
+      `Monies owed to AOSco can be resolved outside of ${agencyName} if ${agencyName} are trading insolvent \u2013 settled with media agency directly, monies due as per the above term dates.`,
+    );
+  }
+  return list;
+}
+
+// ===========================================================================
+// Presentational pieces
+// ===========================================================================
+
+function PageHead({ logoSrc, label }: { logoSrc: string; label: string }) {
+  return (
+    <div className="aosco-page-head">
+      <img src={logoSrc} alt="AOSco" />
+      <span className="aosco-page-head-ref">{label}</span>
+    </div>
+  );
+}
+
+function SectionTitle({ num, children }: { num: string; children: React.ReactNode }) {
+  return (
+    <h2 className="aosco-h2">
+      <span className="aosco-h2-num">{num}</span>
+      <span>{children}</span>
+    </h2>
+  );
+}
+
+function DetailCard({
+  title,
+  rows,
+  wide = false,
+}: {
+  title?: string;
+  rows: Array<[string, React.ReactNode]>;
+  wide?: boolean;
+}) {
+  return (
+    <table className={cx("aosco-card", wide && "aosco-card--wide")}>
+      {title && (
+        <thead>
+          <tr>
+            <th colSpan={2}>{title}</th>
+          </tr>
+        </thead>
+      )}
+      <tbody>
+        {rows.map(([label, value]) => (
+          <tr key={label}>
+            <td className="aosco-card-k">{label}</td>
+            <td>{value || "\u00A0"}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
+function Stat({ label, value, dark = false }: { label: string; value: string; dark?: boolean }) {
+  return (
+    <div className={cx("aosco-stat", dark && "aosco-stat--dark")}>
+      <div className="aosco-stat-label">{label}</div>
+      <div className="aosco-stat-value">{value || "\u00A0"}</div>
+    </div>
+  );
+}
+
+function GlanceTile({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: string;
+  tone?: "dark" | "gold";
+}) {
+  return (
+    <div className={cx("aosco-glance-tile", tone && `aosco-glance-tile--${tone}`)}>
+      <div className="aosco-glance-label">{label}</div>
+      <div className="aosco-glance-value">{value}</div>
+    </div>
+  );
+}
+
+function SignField({ label, value }: { label: string; value?: string }) {
+  return (
+    <div className="aosco-sign">
+      <div className="aosco-mini-label">{label}</div>
+      <div className="aosco-sign-value">{value || "\u00A0"}</div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Campaign schedule grid
+// ---------------------------------------------------------------------------
+
+function ScheduleGrid({ sites, weeks }: { sites: SiteRow[]; weeks: number[] }) {
+  const start = weeks[0];
+  const colOf = (t: number) => Math.floor((t - start) / WEEK_MS);
+  const booked = sites.map((s) => new Set(s.weeks.map(colOf)));
+  const totals = weeks.map((_, i) => booked.reduce((n, set) => n + (set.has(i) ? 1 : 0), 0));
+  const paidSites = sites.filter((s) => !s.bonus).length;
+  const bonusSites = sites.length - paidSites;
+  const dense = weeks.length > 12;
 
   return (
-    <div className="aosco-billing">
-      <table className="aosco-billing-table">
-        <BillingColumns />
-        <BillingHead commissionLabel={commissionLabel} />
+    <div className="aosco-grid-scroll">
+      <table className={cx("aosco-grid", dense && "aosco-grid--dense")}>
+        <colgroup>
+          <col style={{ width: "8%" }} />
+          <col style={{ width: dense ? "17%" : "20%" }} />
+          <col style={{ width: "5%" }} />
+          <col style={{ width: "7%" }} />
+          {weeks.map((w) => (
+            <col key={w} />
+          ))}
+          <col style={{ width: "5%" }} />
+          <col style={{ width: "5%" }} />
+        </colgroup>
+        <thead>
+          <tr>
+            <th colSpan={4} className="aosco-grid-band">
+              {FORMAT_WORD.toUpperCase()} LARGE FORMAT
+            </th>
+            {monthGroups(weeks).map((g, i) => (
+              <th key={g.key} colSpan={g.span} className={cx("aosco-grid-band", i % 2 === 1 && "aosco-grid-band--alt")}>
+                {g.label}
+              </th>
+            ))}
+            <th colSpan={2} className="aosco-grid-band">
+              ACTIVITY SUMMARY
+            </th>
+          </tr>
+          <tr>
+            <th rowSpan={2} className="aosco-grid-sub aosco-left">Site code</th>
+            <th rowSpan={2} className="aosco-grid-sub aosco-left">Site</th>
+            <th rowSpan={2} className="aosco-grid-sub">Spot</th>
+            <th rowSpan={2} className="aosco-grid-sub">Size</th>
+            {weeks.map((w, i) => (
+              <th key={w} className="aosco-grid-sub">
+                WK {i + 1}
+              </th>
+            ))}
+            <th rowSpan={2} className="aosco-grid-sub">Paid sites</th>
+            <th rowSpan={2} className="aosco-grid-sub">Bonus sites</th>
+          </tr>
+          <tr>
+            {weeks.map((w) => (
+              <th key={w} className="aosco-grid-date">
+                {dayMonth(w)}
+              </th>
+            ))}
+          </tr>
+        </thead>
         <tbody>
-          {rows.map((row) => (
-            <tr key={row.key}>
-              <td className="aosco-billing-cell">{row.flighting}</td>
-              <td className="aosco-billing-cell">
-                <BillingDate
-                  day={row.billingDay}
-                  month={row.billingMonth}
-                  year={row.billingYear}
-                />
-              </td>
-              <td className="aosco-billing-cell">{money(row.investment)}</td>
-              <td className="aosco-billing-cell">{money(row.commission)}</td>
-              <td className="aosco-billing-cell">{money(row.net)}</td>
-              <td className="aosco-billing-cell">{money(row.gst)}</td>
-              <td className="aosco-billing-cell">{money(row.total)}</td>
+          {sites.map((s, r) => (
+            <tr key={s.key}>
+              <td className="aosco-left">{s.code || "\u2013"}</td>
+              <td className="aosco-left aosco-grid-site">{s.name}</td>
+              <td className={s.bonus ? "aosco-spot-bonus" : "aosco-spot-paid"}>{s.bonus ? "Bonus" : "Paid"}</td>
+              <td>{s.size || "\u2013"}</td>
+              {weeks.map((w, i) =>
+                booked[r].has(i) ? (
+                  <td key={w} className={s.bonus ? "aosco-cell-gtd" : "aosco-cell-paid"}>
+                    {s.bonus ? "GTD" : "1"}
+                  </td>
+                ) : (
+                  <td key={w} />
+                ),
+              )}
+              <td>{s.bonus ? 0 : 1}</td>
+              <td>{s.bonus ? 1 : 0}</td>
             </tr>
           ))}
-          <tr className="aosco-billing-total">
-            <td colSpan={2} className={cx("aosco-billing-cell", "text-right")}>
-              Campaign Total
-            </td>
-            <td className="aosco-billing-cell">{money(totals.investment)}</td>
-            <td className="aosco-billing-cell">{money(totals.commission)}</td>
-            <td className="aosco-billing-cell">{money(totals.net)}</td>
-            <td className="aosco-billing-cell">{money(totals.gst)}</td>
-            <td className={cx("aosco-billing-cell", "aosco-billing-grand")}>
-              {money(totals.total)}
-            </td>
+          <tr className="aosco-grid-total">
+            <td colSpan={4} className="aosco-left">TOTAL</td>
+            {totals.map((n, i) => (
+              <td key={i}>{n || "\u2013"}</td>
+            ))}
+            <td>{paidSites}</td>
+            <td>{bonusSites}</td>
           </tr>
         </tbody>
       </table>
@@ -3000,380 +908,601 @@ function MonthlyBillingTable({
   );
 }
 
-// Original single-row table, from the deal's total amounts.
-function SingleRowBillingTable({
-  campaignStartDate,
-  campaignEndDate,
-  investment,
-  agencyCommission,
-  gstAmount,
-  totalInvestment,
-  commissionRate,
+interface SiteAmounts {
+  market: number;
+  discount: number;
+  commission: number;
+  investment: number; // after discount and agency commission
+}
+
+// Site rows only carry the client rate and agency commission, so the market
+// rate is worked back from the deal-level discount % (same % on every site).
+function siteAmounts(s: SiteRow, discountRate: number): SiteAmounts {
+  const investment = round2(s.weeks.length * s.netPerWeek);
+  const commission = round2(s.weeks.length * s.commissionPerWeek);
+  const afterDiscount = investment + commission;
+  const market = round2(discountRate < 1 ? afterDiscount / (1 - discountRate) : afterDiscount);
+  return { market, discount: round2(market - afterDiscount), commission, investment };
+}
+
+function PlacementsTable({
+  sites,
+  discountRate,
+  discountLabel,
   commissionLabel,
-}: BillingTableProps & { commissionRate: number; commissionLabel: string }) {
-  // "AUG – OCT 2026", or "NOV 2026 – JAN 2027" when the campaign crosses a year.
-  const flightingWithYear = (() => {
-    const read = (v: CrmValue) => {
-      const m = formatHubspotDate(v).match(/^\d{2}\/(\d{2})\/(\d{4})$/);
-      return m ? { month: FLIGHT_MONTHS[Number(m[1]) - 1], year: m[2] } : null;
-    };
-    const s = read(campaignStartDate);
-    const e = read(campaignEndDate);
-    if (s && e) {
-      if (s.year !== e.year)
-        return `${s.month} ${s.year} \u2013 ${e.month} ${e.year}`;
-      if (s.month !== e.month) return `${s.month} \u2013 ${e.month} ${e.year}`;
-      return `${s.month} ${s.year}`;
-    }
-    const one = s || e;
-    return one ? `${one.month} ${one.year}` : "";
-  })();
-
-  const today = todayInBrisbane();
-
-  const investmentAmount = toAmount(investment);
-  const commission =
-    toAmount(agencyCommission) ??
-    (investmentAmount !== null
-      ? round2(investmentAmount * commissionRate)
-      : null);
-  const net =
-    investmentAmount !== null ? round2(investmentAmount - (commission ?? 0)) : null;
-  // GST is on the amount after agency commission
-  const gst =
-    net !== null ? round2(net * GST_RATE) : toAmount(gstAmount);
-  const total =
-    net !== null
-      ? round2(net + (gst ?? 0))
-      : toAmount(totalInvestment);
+}: {
+  sites: SiteRow[];
+  discountRate: number | null; // null = no market rate on the deal: discount columns hidden
+  discountLabel: string;
+  commissionLabel: string;
+}) {
+  const paidWeeks = sites.filter((s) => !s.bonus).reduce((n, s) => n + s.weeks.length, 0);
+  const bonusWeeks = sites.filter((s) => s.bonus).reduce((n, s) => n + s.weeks.length, 0);
+  const showDiscount = discountRate !== null;
+  const amounts = sites.map((s) => siteAmounts(s, discountRate ?? 0));
+  const sum = (pick: (a: SiteAmounts) => number) => round2(amounts.reduce((n, a) => n + pick(a), 0));
+  const dash = "\u2013";
 
   return (
-    <div className="aosco-billing">
-      <table className="aosco-billing-table">
-        <BillingColumns />
-        <BillingHead commissionLabel={commissionLabel} />
-        <tbody>
-          <tr>
-            <td className="aosco-billing-cell">
-              {flightingWithYear || "\u00A0"}
-            </td>
-            <td className="aosco-billing-cell">
-              <BillingDate
-                day={today.day}
-                month={today.month}
-                year={today.year}
-              />
-            </td>
-            <td className="aosco-billing-cell">{money(investmentAmount)}</td>
-            <td className="aosco-billing-cell">{money(commission)}</td>
-            <td className="aosco-billing-cell">{money(net)}</td>
-            <td className="aosco-billing-cell">{money(gst)}</td>
-            <td className="aosco-billing-cell">{money(total)}</td>
-          </tr>
-          <tr>
-            <td colSpan={6} className={cx("aosco-billing-cell", "text-right")}>
-              Campaign Total
-            </td>
-            <td className={cx("aosco-billing-cell", "aosco-billing-grand")}>
-              {money(total)}
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
+    <table className="aosco-table aosco-table--compact">
+      <thead>
+        <tr>
+          <th style={{ width: "8%" }}>Site code</th>
+          <th>Site</th>
+          <th style={{ width: "5%" }}>State</th>
+          <th style={{ width: "10%" }}>Format &amp; size</th>
+          <th style={{ width: "14%" }}>Week commencing</th>
+          <th className="mid" style={{ width: "6%" }}>Paid weeks</th>
+          <th className="mid" style={{ width: "6%" }}>Bonus weeks</th>
+          {showDiscount && <th className="num" style={{ width: "9%" }}>Market rate</th>}
+          {showDiscount && <th className="num" style={{ width: "9%" }}>{discountLabel}</th>}
+          <th className="num" style={{ width: "9%" }}>{commissionLabel}</th>
+          <th className="num" style={{ width: "9%" }}>Investment</th>
+        </tr>
+      </thead>
+      <tbody>
+        {sites.map((s, i) => {
+          const first = s.weeks[0];
+          const last = s.weeks[s.weeks.length - 1];
+          const a = amounts[i];
+          return (
+            <tr key={s.key}>
+              <td>{s.code || "\u2013"}</td>
+              <td className="strong">{s.name}</td>
+              <td>{s.state}</td>
+              <td>{[FORMAT_WORD, s.size].filter(Boolean).join(" ")}</td>
+              <td>
+                {first === undefined
+                  ? "\u2013"
+                  : s.weeks.length === 1
+                    ? dayMonthYear(first)
+                    : `${dayMonthYear(first)} \u2013 ${dayMonthYear(last)}`}
+              </td>
+              <td className="mid">{s.bonus ? "\u2013" : s.weeks.length}</td>
+              <td className={cx("mid", s.bonus && "aosco-table-bonus")}>
+                {s.bonus ? `${s.weeks.length} (GTD)` : "\u2013"}
+              </td>
+              {showDiscount && <td className="num">{s.bonus ? dash : money(a.market)}</td>}
+              {showDiscount && <td className="num">{s.bonus ? dash : negativeMoney(a.discount)}</td>}
+              <td className="num">{s.bonus ? dash : negativeMoney(a.commission)}</td>
+              <td className={cx("num", s.bonus ? "aosco-table-bonus" : "strong")}>
+                {s.bonus ? "No charge" : money(a.investment)}
+              </td>
+            </tr>
+          );
+        })}
+        <tr className="aosco-table-total">
+          <td>TOTAL</td>
+          <td />
+          <td />
+          <td />
+          <td />
+          <td className="mid">{paidWeeks}</td>
+          <td className="mid">{bonusWeeks}</td>
+          {showDiscount && <td className="num">{money(sum((a) => a.market))}</td>}
+          {showDiscount && <td className="num">{negativeMoney(sum((a) => a.discount))}</td>}
+          <td className="num">{negativeMoney(sum((a) => a.commission))}</td>
+          <td className="num">{money(sum((a) => a.investment))}</td>
+        </tr>
+      </tbody>
+    </table>
   );
 }
 
-// ---------------------------------------------------------------------------
+// ===========================================================================
 // Component — HubSpot quote module entry point
-// ---------------------------------------------------------------------------
+// ===========================================================================
 
 export function Component({ hublData }: Props) {
   const h: HublData = hublData || ({} as HublData);
+  const data = parseJsonProperty<QuoteMasterData>(h.scheduleSummaryJson) as QuoteMasterData;
+  const agencyData = parseJsonProperty<AgencyQuoteMasterData>(h.agencyQuoteJson) as AgencyQuoteMasterData;
 
-  const data = parseQuoteMasterData(h.scheduleSummaryJson);
-  const agencyData = parseAgencyQuoteMasterData(h.agencyQuoteJson);
-
-  const documentTitle = data.documentTitle || "ADVERTISING AGREEMENT";
-  const companyLegalName =
-    data.companyLegalName || "Australian Outdoor Sign Company Pty Ltd";
-  const coverSrc =
-    "https://443453524.fs1.hubspotusercontent-ap1.net/hubfs/443453524/Quote%20Cover.png";
-  const logoSrc =
-    "https://443453524.fs1.hubspotusercontent-ap1.net/hubfs/443453524/logo.png";
-  const coverImageSrc = data.coverImageSrc;
+  const documentTitle = firstFilled(data.documentTitle, "ADVERTISING ORDER");
+  const companyLegalName = firstFilled(data.companyLegalName, "Australian Outdoor Sign Company Pty Ltd");
+  const logoSrc = firstFilled(data.logoSrc, LOGO_SRC);
+  const heroSrc = firstFilled(data.coverImageSrc, HERO_IMAGE_SRC);
 
   // -------------------------------------------------------------------------
-  // DEAL → form field mapping
-  // Priority everywhere: deal property → quote_master_data JSON → default.
-  // Advertiser and Accounts are the same person; Agency is a different one.
+  // People. Priority: deal property -> quote_master_data -> default.
+  // The agency contact (when there is one) is the person the order is
+  // addressed to, signs it, and receives the invoices.
   // -------------------------------------------------------------------------
-  const advertiserFullName = fullName(
-    h.advertiserFirstName,
-    h.advertiserLastName,
-  );
-  const agencyFullName = fullName(h.agencyFirstName, h.agencyLastName);
-
-  // Advertiser Details
-  const adv: AdvertiserDetails = {
-    greetingName: firstFilled(
-      h.advertiserFirstName,
-      data.advertiser?.greetingName,
-      DEFAULT_ADVERTISER.greetingName,
-    ),
+  const adv = {
     companyName: firstFilled(h.advertiserCompany, data.advertiser?.companyName),
-    contactName: firstFilled(advertiserFullName, data.advertiser?.contactName),
+    contactName: firstFilled(fullName(h.advertiserFirstName, h.advertiserLastName), data.advertiser?.contactName),
     phone: firstFilled(h.advertiserPhone, data.advertiser?.phone),
     email: firstFilled(h.advertiserEmail, data.advertiser?.email),
-    address: firstFilled(data.advertiser?.address),
   };
 
-  // Account Details — same person as the advertiser
-  const acc: AccountDetails = {
-    accountsName: firstFilled(adv.contactName, data.account?.accountsName),
-    accountsProcess: firstFilled(
-      data.account?.accountsProcess,
-      adv.greetingName
-        ? `Please send to ${adv.greetingName} for distribution and payment`
-        : "",
-      DEFAULT_ACCOUNT.accountsProcess,
-    ),
-    accountsEmail: firstFilled(adv.email, data.account?.accountsEmail),
-  };
-
-  // Agency Details — separate person
-  const agency: AgencyDetails = {
-    agencyName: firstFilled(h.agencyCompanyName, data.agency?.agencyName),
-    addressLine1: firstFilled(h.agencyAddress, data.agency?.addressLine1),
-    addressLine2: firstFilled(h.agencyAddressLine2, data.agency?.addressLine2),
-    contactName: firstFilled(agencyFullName, data.agency?.contactName),
-    phone: firstFilled(h.agencyPhone), // no agency phone property on the deal yet
+  const agency = {
+    name: firstFilled(h.agencyCompanyName, data.agency?.agencyName),
+    shortName: firstFilled(data.agency?.shortName),
+    address: [
+      firstFilled(h.agencyAddress, data.agency?.addressLine1),
+      firstFilled(h.agencyAddressLine2, data.agency?.addressLine2),
+    ]
+      .filter(Boolean)
+      .join(", "),
+    contactName: firstFilled(fullName(h.agencyFirstName, h.agencyLastName), data.agency?.contactName),
+    phone: firstFilled(h.agencyPhone, data.agency?.phone),
     email: firstFilled(h.agencyEmail, data.agency?.email),
   };
 
-  // Campaign Booking
-  const camp: CampaignBooking = {
-    campaignName: firstFilled(h.dealName, data.campaign?.campaignName),
-    referenceId: firstFilled(
-      data.campaign?.referenceId,
-      h.dealId ? `AOS-${firstFilled(h.dealId)}` : "",
-      DEFAULT_CAMPAIGN.referenceId,
-    ),
-    // "NETWORK" for all 18 sites, otherwise the number of billboards on the schedule
-    siteSizeType: firstFilled(
-      data.campaign?.siteSizeType,
-      siteSizeTypeLabel(data, agencyData),
-    ),
-    // Not specified by the client yet — only filled if quote_master_data provides it.
-    type: firstFilled(data.campaign?.type),
-    // Total campaign length in weeks, bonus weeks included
-    weeksRequired: campaignWeeks(
-      data,
-      agencyData,
-      formatHubspotDate(h.campaignStartDate),
-      formatHubspotDate(h.campaignEndDate),
-    ),
-    startDate: formatHubspotDate(h.campaignStartDate),
-    endDate: formatHubspotDate(h.campaignEndDate),
+  const primary = agency.contactName
+    ? {
+        name: agency.contactName,
+        first: firstFilled(h.agencyFirstName, agency.contactName.split(" ")[0]),
+        email: agency.email,
+      }
+    : {
+        name: adv.contactName,
+        first: firstFilled(h.advertiserFirstName, data.advertiser?.greetingName, adv.contactName.split(" ")[0]),
+        email: adv.email,
+      };
+  const greetingName = firstFilled(primary.first, data.advertiser?.greetingName, "Customer");
+  const accounts = {
+    name: firstFilled(primary.name, data.account?.accountsName),
+    email: firstFilled(primary.email, data.account?.accountsEmail),
   };
 
-  const exec: Execution = {
-    advertiser: {
-      ...DEFAULT_EXECUTION.advertiser,
-      ...(data.execution?.advertiser || {}),
-      representativeName: firstFilled(
-        data.execution?.advertiser?.representativeName,
-        adv.contactName,
-      ),
-    },
-    aosco: { ...DEFAULT_EXECUTION.aosco, ...(data.execution?.aosco || {}) },
-  };
+  // -------------------------------------------------------------------------
+  // Schedule
+  // -------------------------------------------------------------------------
+  const defaultState = firstFilled(data.scheduleMeta?.state, DEFAULT_STATE);
+  const sites = buildSites(data, agencyData, defaultState);
+  const paidSites = sites.filter((s) => !s.bonus);
+  const bonusSites = sites.filter((s) => s.bonus);
+  const paidWeeks = paidSites.reduce((n, s) => n + s.weeks.length, 0);
+  const bonusWeeks = bonusSites.reduce((n, s) => n + s.weeks.length, 0);
 
-  const specialConditions =
-    data.specialConditions ?? DEFAULT_SPECIAL_CONDITIONS;
+  const bookedTimes = sites.flatMap((s) => s.weeks);
+  const firstBooked = bookedTimes.length ? Math.min(...bookedTimes) : null;
+  const lastBooked = bookedTimes.length ? Math.max(...bookedTimes) : null;
+
+  const dealStart = parseDealDate(h.campaignStartDate);
+  const dealEnd = parseDealDate(h.campaignEndDate);
+  const startMs = dealStart ?? firstBooked;
+  const endMs = dealEnd ?? (lastBooked !== null ? lastBooked + 6 * DAY_MS : null);
+
+  const weekColumns = buildWeekColumns(bookedTimes, dealStart, dealEnd);
+  const weekdays = uniq(bookedTimes.map((t) => new Date(t).getUTCDay()));
+  const states = uniq(sites.map((s) => s.state).filter(Boolean));
+
+  // -------------------------------------------------------------------------
+  // Campaign
+  // -------------------------------------------------------------------------
+  const campaignName = firstFilled(h.dealName, data.campaign?.campaignName);
+  const titleMatch = campaignName.match(/^(.*?)\s*(\([^)]*\))\s*$/);
+  const titleMain = titleMatch && titleMatch[1] ? titleMatch[1] : campaignName;
+  const titleParen = titleMatch && titleMatch[1] ? titleMatch[2] : "";
+
+  const referenceId = firstFilled(
+    data.campaign?.referenceId,
+    h.dealId ? `AOS-${firstFilled(h.dealId)}` : "",
+  );
+
+  const uniqueSiteCount = new Set(sites.map((s) => (s.code || s.name).toLowerCase())).size;
+  const isNetwork = uniqueSiteCount >= NETWORK_SITE_COUNT;
+  const localities = uniq(sites.map((s) => s.locality));
+  const shortLocalities =
+    localities.length > 0 && localities.length <= 2 && localities.every(Boolean) ? localities : [];
+
+  const sitesTile = isNetwork
+    ? "AOSco Network"
+    : shortLocalities.length
+      ? shortLocalities.join(" + ")
+      : uniqueSiteCount
+        ? plural(uniqueSiteCount, "site")
+        : "";
+
+  const subtitle = [
+    titleParen,
+    firstFilled(
+      data.scheduleMeta?.locality,
+      shortLocalities.length ? `${shortLocalities.join(" & ")} ${FORMAT_WORD}` : "",
+    ),
+  ]
+    .filter(Boolean)
+    .join(" \u00B7 ");
+
+  const onAir = bonusWeeks
+    ? `${paidWeeks} paid + ${plural(bonusWeeks, "bonus week")}`
+    : paidWeeks
+      ? plural(paidWeeks, "paid week")
+      : "";
+
+  const weeksRequired = bonusWeeks
+    ? `${plural(paidWeeks + bonusWeeks, "week")} (${paidWeeks} paid + ${bonusWeeks} guaranteed bonus)`
+    : paidWeeks
+      ? plural(paidWeeks, "week")
+      : "";
+
+  const sitesBooking = firstFilled(
+    data.campaign?.siteSizeType,
+    isNetwork
+      ? "NETWORK \u2013 as per schedule"
+      : sites.length
+        ? `As per schedule: ${joinAnd(
+            sites.map(
+              (s) =>
+                `${s.name} (${[s.code, s.bonus ? "guaranteed bonus" : "paid"].filter(Boolean).join(", ")})`,
+            ),
+          )}`
+        : "",
+  );
+
+  // -------------------------------------------------------------------------
+  // Money
+  // -------------------------------------------------------------------------
+  const configuredRate = toRate(h.agencyDiscount);
+  const marketRate = toAmount(h.actualMarketRate);
+  const monthRows = monthlyBillingRows(agencyData, sites);
+  const billingRows = monthRows.length
+    ? monthRows
+    : dealBillingRows(h.investment, marketRate, configuredRate ?? DEFAULT_COMMISSION_RATE, startMs, endMs);
+  const totals = sumRows(billingRows);
+
+  // Both the discount and the agency commission are taken off the market rate:
+  //   actualMarketRate - discount - agency commission = investment
+  //   investment + GST = totalInvestment
+  // Deal amounts win; the billing rows fill any gaps.
+  const investment = toAmount(h.investment) ?? totals?.net ?? null;
+  const commission = totals?.commission ?? null;
+  const discount =
+    marketRate !== null && investment !== null
+      ? round2(Math.max(0, marketRate - investment - (commission ?? 0)))
+      : null;
+  const gstAmount = toAmount(h.gstAmount) ?? (investment !== null ? round2(investment * GST_RATE) : null);
+  const totalInvestment =
+    toAmount(h.totalInvestment) ?? (investment !== null && gstAmount !== null ? round2(investment + gstAmount) : null);
+  const discountRate = discount !== null && marketRate ? discount / marketRate : null;
+
+  // Agency % is deal.agency_discount, else commission / market rate. Never
+  // commission / (investment + commission): that ignores the other discount (10% -> 11.11%).
+  const commissionRate =
+    configuredRate ??
+    (marketRate && commission !== null
+      ? commission / marketRate
+      : monthRows.length
+        ? null
+        : DEFAULT_COMMISSION_RATE);
+  const rateLabel = commissionRate !== null ? formatRate(commissionRate) : "";
+  const discountRateLabel = discountRate !== null ? formatRate(discountRate) : "";
+  const agencyPrefix = agency.shortName || "Agency";
+  const commissionLabel = [`${agencyPrefix} commission`, rateLabel].filter(Boolean).join(" ");
+  const discountLabel = ["Discount", discountRateLabel].filter(Boolean).join(" ");
+
+  const bonusNote = firstFilled(
+    data.scheduleMeta?.bonusNote,
+    bonusSites.length
+      ? `${joinAnd(bonusSites.map((s) => s.name))} ${bonusWeeks === 1 ? "bonus week" : "bonus weeks"} supplied as a guaranteed bonus (GTD) at no charge.`
+      : "",
+  );
+
+  // -------------------------------------------------------------------------
+  // Conditions + execution
+  // -------------------------------------------------------------------------
+  const specialConditions = data.specialConditions ?? defaultSpecialConditions(agency.name);
+
+  const execAdvertiser = {
+    ...DEFAULT_EXECUTION.advertiser,
+    ...(data.execution?.advertiser || {}),
+    representativeName: firstFilled(data.execution?.advertiser?.representativeName, primary.name),
+  };
+  const execAosco = { ...DEFAULT_EXECUTION.aosco, ...(data.execution?.aosco || {}) };
+  const advertiserEntity = firstFilled(
+    data.execution?.advertiser?.onBehalfOf,
+    adv.companyName,
+    agency.name,
+  );
+
+  const headLabel = [documentTitle, referenceId].filter(Boolean).join(" \u00B7 ");
 
   return (
     <div className="aosco-root">
       <style>{MODULE_CSS}</style>
 
-      {/* Cover page */}
-      <section className="aosco-cover">
-        {coverImageSrc && (
-          <img src={coverImageSrc} alt="" className="aosco-cover-img" />
-        )}
-        <div className="aosco-cover-overlay" />
+      {/* ================= cover ================= */}
+      <section className="aosco-sheet">
+        <img src={logoSrc} alt={companyLegalName} className="aosco-cover-logo" />
 
-        <div className="aosco-cover-center">
-          {coverSrc ? (
-            <img
-              src={coverSrc}
-              alt={companyLegalName}
-              className="aosco-cover-logo-img"
-            />
-          ) : (
-            <div>
-              <div className="aosco-text-logo">
-                AOS<span className="aosco-text-logo-sup">Co.</span>
-              </div>
-              <p className="aosco-tagline">Australian Outdoor Sign Company</p>
-            </div>
-          )}
+        <p className="aosco-eyebrow">{documentTitle}</p>
+        <h1 className="aosco-cover-title">{titleMain || "\u00A0"}</h1>
+        {subtitle && <p className="aosco-cover-sub">{subtitle}</p>}
+
+        <div className="aosco-hero">
+          <img src={heroSrc} alt="" />
         </div>
+        <p className="aosco-hero-caption">
+          AOSco &ndash; Queensland&rsquo;s fastest growing digital billboard network.
+        </p>
+
+        <div className="aosco-stats">
+          <Stat label="Campaign" value={monthRangeLabel(startMs, endMs)} />
+          <Stat label="Sites" value={sitesTile} />
+          <Stat label="On air" value={onAir} />
+          <Stat
+            label="Investment"
+            value={investment !== null ? `${formatCurrency(investment, true)} + GST` : ""}
+            dark
+          />
+        </div>
+
+        <div className="aosco-prepared">
+          <div>
+            <div className="aosco-mini-label">Prepared for</div>
+            <p className="aosco-prepared-name">{primary.name || "\u00A0"}</p>
+            <p className="aosco-prepared-org">{adv.companyName || agency.name}</p>
+          </div>
+          <div>
+            <div className="aosco-mini-label">Prepared by</div>
+            <p className="aosco-prepared-name">
+              {[execAosco.representativeName, execAosco.position].filter(Boolean).join(", ")}
+            </p>
+            <p className="aosco-prepared-org">{companyLegalName}</p>
+          </div>
+        </div>
+
+        {referenceId && (
+          <p className="aosco-ref">
+            <strong>Reference ID:</strong> {referenceId}
+          </p>
+        )}
       </section>
 
-      {/* Content page header bar */}
-      <div className="aosco-header-bar">
-        <h1 className="aosco-header-title">{documentTitle}</h1>
-        {logoSrc ? (
-          <img
-            src={logoSrc}
-            alt={companyLegalName}
-            className="aosco-header-logo-img"
-          />
-        ) : (
-          <span className="aosco-header-text-logo">
-            AOS<span className="aosco-header-text-logo-sup">Co.</span>
-          </span>
-        )}
-      </div>
+      {/* ================= summary, booking, investment ================= */}
+      <section className="aosco-sheet">
+        <PageHead logoSrc={logoSrc} label={headLabel} />
 
-      <div className="aosco-body">
-        <p className="aosco-greeting">Dear {adv.greetingName || "\u00A0"},</p>
+        <SectionTitle num="01">Order summary</SectionTitle>
+        <p className="aosco-greeting">Dear {greetingName},</p>
         <p className="aosco-intro">
-          Thank you for the opportunity to provide our services to you.
-        </p>
-        <p className="aosco-intro-last">
-          This document and the <strong>attached</strong> Terms and Conditions
-          set out the basis on which AOSCO provide our services.
+          Thank you for the opportunity to provide our services to you. This Advertising Order and the
+          attached Terms and Conditions set out the basis on which AOSco provide our services.
         </p>
 
-        {/* Advertiser + Account + Agency Details */}
-        <section className="aosco-section">
-          <p className="aosco-section-heading">Advertiser Details</p>
-          <FieldLine label="COMPANY NAME:" value={adv.companyName} />
-          <FieldLine label="Contact Name:" value={adv.contactName} />
-          <FieldLine label="Phone Number:" value={adv.phone} />
-          <FieldLine label="Email Address:" value={adv.email} />
-
-          <p
-            className={cx("aosco-section-heading", "aosco-section-heading--mt")}
-          >
-            Account Details
-          </p>
-          <FieldLine label="Accounts Name:" value={acc.accountsName} />
-          <FieldLine
-            label="Accounts Process:"
-            value={acc.accountsProcess}
-            underline={false}
+        <div className="aosco-cols">
+          <DetailCard
+            title="Advertiser details"
+            rows={[
+              ["Company", adv.companyName],
+              ["Contact", adv.contactName || "N/A"],
+              ["Phone", adv.phone],
+              ["Email", adv.email],
+            ]}
           />
-          <FieldLine label="Accounts Email 1:" value={acc.accountsEmail} />
-
-          <p
-            className={cx("aosco-section-heading", "aosco-section-heading--mt")}
-          >
-            Agency Details
-          </p>
-          <FieldLine label="Agency Name:" value={agency.agencyName} />
-          <FieldLine label="Address:" value={agency.addressLine1} />
-          <FieldLine label={"\u00A0"} value={agency.addressLine2} />
-          <FieldLine label="Contact Name:" value={agency.contactName} />
-          <FieldLine label="Phone Number:" value={agency.phone} />
-          <FieldLine label="Email Address:" value={agency.email} />
-        </section>
-
-        {/* Campaign Booking */}
-        <section className="aosco-section">
-          <p className="aosco-section-heading">Campaign Booking</p>
-          <FieldLine label="Campaign Name:" value={camp.campaignName} />
-          <FieldLine label="Reference ID:" value={camp.referenceId} />
-          <FieldLine
-            label="Site, Size & Type of Selected Billboards:"
-            value={camp.siteSizeType}
+          <DetailCard
+            title="Agency details"
+            rows={[
+              ["Agency", agency.name],
+              ["Address", agency.address],
+              ["Contact", agency.contactName],
+              ["Phone", agency.phone],
+              ["Email", agency.email],
+            ]}
           />
-          <FieldLine label="Type:" value={camp.type} />
-          <FieldLine label="Weeks Required:" value={camp.weeksRequired} />
-          <FieldLine label="Start Date:" value={camp.startDate} />
-          <FieldLine label="End Date:" value={camp.endDate} />
-        </section>
-
-        {/* Schedule + Billing */}
-        <section className="aosco-section">
-          <p className="aosco-section-heading aosco-section-heading--underline">
-            Schedule:
-          </p>
-
-          <p>
-            Schedule Below runs for 6 weeks as planned below across the AOSCO
-            Network{" "}
-          </p>
-
-          <br />
-          <p className="aosco-section-heading aosco-section-heading--underline">
-            Billing:
-          </p>
-          <p className="aosco-section-heading">
-            AOSCO is offering a 10% Discount for Upfront Billing from $10,000
-            Investment
-          </p>
-
-          <BillingTable
-            agencyData={agencyData}
-            agencyDiscount={h.agencyDiscount}
-            campaignStartDate={h.campaignStartDate}
-            campaignEndDate={h.campaignEndDate}
-            investment={h.investment}
-            gstAmount={h.gstAmount}
-            totalInvestment={h.totalInvestment}
+          <DetailCard
+            title="Account details"
+            rows={[
+              ["Accounts contact", accounts.name],
+              ["Accounts email", accounts.email],
+            ]}
           />
-        </section>
+        </div>
 
-        {/* Special Conditions */}
-        <section className="aosco-section">
-          <p className="aosco-section-heading aosco-section-heading--underline">
-            Special conditions:
-          </p>
-          <ol className="aosco-sc-list" style={{ listStyleType: "decimal" }}>
-            {specialConditions.map((c, i) => (
-              <li key={i}>{c}</li>
-            ))}
-          </ol>
-        </section>
+        <SectionTitle num="02">Campaign booking</SectionTitle>
+        <DetailCard
+          wide
+          rows={[
+            ["Campaign name", campaignName],
+            ["Reference ID", referenceId],
+            ["Sites, size & type", sitesBooking],
+            ["Type", firstFilled(data.campaign?.type, DEFAULT_TYPE)],
+            ["Weeks required", weeksRequired],
+            ["Start date", startMs !== null ? formatDmy(startMs) : ""],
+            ["End date", endMs !== null ? formatDmy(endMs) : ""],
+          ]}
+        />
 
-        {/* Execution / signatures */}
-        <section className="aosco-section aosco-section--exec">
-          <p className="aosco-section-heading">Execution</p>
-          <p className="aosco-exec-intro">
-            I acknowledge that I have received and read this Agreement, confirm
-            that the details contained within (including regarding payments due)
-            are correct and hereby agree to be bound to this Agreement and the
-            Terms and Conditions as <strong>attached.</strong>
-          </p>
-          <div className="aosco-exec-grid">
-            <div>
-              <p className="aosco-exec-col-title">
-                Executed on behalf of {adv.companyName || "\u00A0"} by
-              </p>
-              <FieldLine
-                label="Representative Name:"
-                value={exec.advertiser.representativeName}
-              />
-              <FieldLine label="Position:" value={exec.advertiser.position} />
-              <FieldLine label="Date:" value={exec.advertiser.date} />
+        <SectionTitle num="03">Investment at a glance</SectionTitle>
+        <div className="aosco-glance aosco-glance--six">
+          <GlanceTile label="Market rate" value={money(marketRate)} />
+          <GlanceTile label={discountLabel} value={negativeMoney(discount)} />
+          <GlanceTile label={commissionLabel} value={negativeMoney(commission)} />
+          <GlanceTile
+            label="Investment"
+            value={investment !== null ? `${money(investment)} + GST` : "\u2014"}
+            tone="dark"
+          />
+          <GlanceTile label={`GST ${formatRate(GST_RATE)}`} value={money(gstAmount)} />
+          <GlanceTile label="Total investment inc GST" value={money(totalInvestment)} tone="gold" />
+        </div>
+        {bonusNote && <p className="aosco-note">{bonusNote}</p>}
+      </section>
+
+      {/* ================= campaign schedule (landscape) ================= */}
+      <section className="aosco-sheet aosco-sheet--landscape">
+        <SectionTitle num="04">Campaign schedule</SectionTitle>
+
+        {sites.length > 0 && weekColumns.length > 0 ? (
+          <>
+            <div className="aosco-legend">
+              <span className="aosco-legend-item">
+                <span className="aosco-swatch aosco-swatch--paid" /> Paid week
+              </span>
+              {bonusSites.length > 0 && (
+                <span className="aosco-legend-item">
+                  <span className="aosco-swatch aosco-swatch--gtd" /> Guaranteed bonus week (GTD) &ndash; no charge
+                </span>
+              )}
+              <span className="aosco-legend-meta">
+                {[
+                  `${FORMAT_WORD} large format`,
+                  states.join(", "),
+                  weekdays.length === 1 ? `All weeks commence ${WEEKDAYS[weekdays[0]]}` : "",
+                ]
+                  .filter(Boolean)
+                  .join(" \u00B7 ")}
+              </span>
             </div>
-            <div>
-              <p className="aosco-exec-col-title">
-                Executed on behalf of {companyLegalName}
-              </p>
-              <FieldLine
-                label="Representative Name:"
-                value={exec.aosco.representativeName}
-              />
-              <FieldLine label="Position:" value={exec.aosco.position} />
-              <FieldLine label="Date:" value={exec.aosco.date} />
-            </div>
+            <ScheduleGrid sites={sites} weeks={weekColumns} />
+
+            <p className="aosco-h3">Placements</p>
+            <PlacementsTable
+              sites={sites}
+              discountRate={discountRate}
+              discountLabel={discountLabel}
+              commissionLabel={commissionLabel}
+            />
+          </>
+        ) : (
+          <p>The schedule will be confirmed before the campaign starts.</p>
+        )}
+
+        <table className="aosco-table aosco-gap">
+          <thead>
+            <tr>
+              <th>Investment summary</th>
+              <th className="num" style={{ width: "22%" }}>Amount</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Market rate (before discounts)</td>
+              <td className="num">{money(marketRate)}</td>
+            </tr>
+            <tr>
+              <td>Less discount{discountRateLabel ? ` (${discountRateLabel})` : ""}</td>
+              <td className="num">{negativeMoney(discount)}</td>
+            </tr>
+            <tr>
+              <td>
+                Less {agency.shortName ? `${agency.shortName} ` : ""}agency commission{rateLabel ? ` (${rateLabel})` : ""}
+              </td>
+              <td className="num">{negativeMoney(commission)}</td>
+            </tr>
+            <tr>
+              <td className="strong">Investment (ex GST)</td>
+              <td className="num strong">{money(investment)}</td>
+            </tr>
+            <tr>
+              <td>Plus GST ({formatRate(GST_RATE)})</td>
+              <td className="num">{money(gstAmount)}</td>
+            </tr>
+            <tr className="aosco-table-total">
+              <td>Total investment inc GST</td>
+              <td className="num">{money(totalInvestment)}</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      {/* ================= billing, conditions, execution ================= */}
+      <section className="aosco-sheet">
+        <SectionTitle num="05">Billing</SectionTitle>
+        {(accounts.name || accounts.email) && (
+          <p className="aosco-accounts">
+            <strong>Accounts:</strong> {[accounts.name, accounts.email].filter(Boolean).join(" \u00B7 ")}
+          </p>
+        )}
+        <table className="aosco-table">
+          <thead>
+            <tr>
+              <th style={{ width: "13%" }}>Flighting dates</th>
+              <th style={{ width: "17%" }}>Billing cycle monthly (EOM)</th>
+              <th className="num">Rate after discount</th>
+              <th className="num">{commissionLabel}</th>
+              <th className="num">Total (less agency comm)</th>
+              <th className="num">GST {formatRate(GST_RATE)}</th>
+              <th className="num">Total due to AOSco inc GST</th>
+            </tr>
+          </thead>
+          <tbody>
+            {billingRows.length === 0 ? (
+              <tr>
+                <td colSpan={7} className="aosco-table-small">
+                  Billing will be confirmed with the final schedule.
+                </td>
+              </tr>
+            ) : (
+              billingRows.map((row) => (
+                <tr key={row.key}>
+                  <td>{row.flighting || "\u00A0"}</td>
+                  <td>{billingDateLabel(row.billing)}</td>
+                  <td className="num">{money(row.investment)}</td>
+                  <td className="num">{money(row.commission)}</td>
+                  <td className="num">{money(row.net)}</td>
+                  <td className="num">{money(row.gst)}</td>
+                  <td className="num">{money(row.total)}</td>
+                </tr>
+              ))
+            )}
+            <tr className="aosco-table-total">
+              <td colSpan={6} className="num">Campaign total</td>
+              <td className="num">{money(totals?.total)}</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <SectionTitle num="06">Special conditions</SectionTitle>
+        <ol className="aosco-sc">
+          {specialConditions.map((c, i) => (
+            <li key={i}>{c}</li>
+          ))}
+        </ol>
+
+        <SectionTitle num="07">Execution</SectionTitle>
+        <p>
+          I acknowledge that I have received and read this Agreement, confirm that the details contained
+          within (including regarding payments due) are correct and hereby agree to be bound to this
+          Agreement and the Terms and Conditions as attached.
+        </p>
+        <div className="aosco-exec">
+          <div>
+            <div className="aosco-exec-eyebrow">Executed on behalf of</div>
+            <p className="aosco-exec-entity">{advertiserEntity || "\u00A0"}</p>
+            {execAdvertiser.representativeName && (
+              <p className="aosco-exec-by">by {execAdvertiser.representativeName}</p>
+            )}
+            <SignField label="Representative name" value={execAdvertiser.representativeName} />
+            <SignField label="Position" value={execAdvertiser.position} />
+            <SignField label="Signature" />
+            <SignField label="Date" value={execAdvertiser.date} />
           </div>
-        </section>
-      </div>
+          <div>
+            <div className="aosco-exec-eyebrow">Executed on behalf of</div>
+            <p className="aosco-exec-entity">{companyLegalName}</p>
+            {execAosco.representativeName && (
+              <p className="aosco-exec-by">by {execAosco.representativeName}</p>
+            )}
+            <SignField label="Representative name" value={execAosco.representativeName} />
+            <SignField label="Position" value={execAosco.position} />
+            <SignField label="Signature" />
+            <SignField label="Date" value={execAosco.date} />
+          </div>
+        </div>
+      </section>
     </div>
   );
 }
@@ -3384,13 +1513,12 @@ export const meta = {
 };
 
 // Single source of truth: every value is read from the DEAL record.
-// The billing contact / billing company attached to the quote are ignored.
 // The deal lookup is guarded because a quote blueprint preview may not
 // have a deal attached.
 export const hublDataTemplate = `
   {% set dealData = {} %}
   {% if quoteTemplateContext.deal and quoteTemplateContext.deal.hs_object_id %}
-    {% set dealData = crm_object("deal", quoteTemplateContext.deal.hs_object_id, "hs_object_id,dealname,quote_master_data,agency_quote_master_data,agency_discount,campaign_start_date,campaign_end_date,total_commercial_rate,gst_amount,total_investment,advertiser_company,advertiser_contact_first_name,advertiser_contact_last_name,advertiser_person_phone_number,advertiser_person_email_address,agency_company_name,agency_person_first_name,agency_person_last_name,agency_person_email,agency_company_address,agency_address_line_2,agency_person_phone") %}
+    {% set dealData = crm_object("deal", quoteTemplateContext.deal.hs_object_id, "hs_object_id,dealname,quote_master_data,agency_quote_master_data,agency_discount,campaign_start_date,campaign_end_date,total_commercial_rate,gst_amount,total_investment,advertiser_company,advertiser_contact_first_name,advertiser_contact_last_name,advertiser_person_phone_number,advertiser_person_email_address,agency_company_name,agency_person_first_name,agency_person_last_name,agency_person_email,agency_company_address,agency_address_line_2,agency_person_phone,total_bill_amount_before_discount_total_market_rate") %}
   {% endif %}
 
   {% set hublData = {
@@ -3402,6 +1530,7 @@ export const hublDataTemplate = `
     "totalInvestment": dealData.total_investment,
     "investment": dealData.total_commercial_rate,
     "gstAmount": dealData.gst_amount,
+    "actualMarketRate": dealData.total_bill_amount_before_discount_total_market_rate,
     "scheduleSummaryJson": dealData.quote_master_data,
     "agencyQuoteJson": dealData.agency_quote_master_data,
     "agencyDiscount": dealData.agency_discount,
