@@ -1,0 +1,139 @@
+.aosco-root {
+  --navy: #1f2b46; --blue: #2f6db5; --ink: #1f2937; --muted: #6b7280;
+  --line: #d6dbe4; --panel: #f3f5f9; --panel-2: #dde4ee;
+  --gold: #f6b40e; --gold-ink: #a0700b; --cream: #fdf2cf;
+  max-width: 64rem; margin: 0 auto; background: #fff; color: var(--ink);
+  font-family: Arial, Helvetica, sans-serif; font-size: 14px; line-height: 1.45;
+  -webkit-print-color-adjust: exact; print-color-adjust: exact;
+}
+.aosco-root * { box-sizing: border-box; }
+.aosco-root p { margin: 0; }
+
+.aosco-sheet { padding: 48px 56px 28px; }
+.aosco-sheet + .aosco-sheet { border-top: 1px dashed var(--line); }
+
+/* Cover */
+.aosco-cover-logo { height: 84px; display: block; }
+.aosco-eyebrow { margin-top: 48px; color: var(--blue); font-size: 13px; font-weight: 700; letter-spacing: 0.3em; text-transform: uppercase; }
+.aosco-cover-title { margin: 6px 0 2px; color: var(--navy); font-size: 40px; font-weight: 800; line-height: 1.15; }
+.aosco-cover-sub { color: var(--muted); font-size: 20px; }
+.aosco-hero { margin-top: 28px; height: 460px; background: var(--navy); overflow: hidden; }
+.aosco-hero img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.aosco-hero-caption { margin-top: 6px !important; color: var(--muted); font-size: 11px; font-style: italic; }
+
+.aosco-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 2px; margin-top: 36px; border-top: 3px solid var(--navy); }
+.aosco-stat { background: var(--panel); padding: 16px 14px 18px; }
+.aosco-stat-label { color: var(--muted); font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }
+.aosco-stat-value { margin-top: 4px; color: var(--navy); font-size: 18px; font-weight: 700; line-height: 1.2; }
+.aosco-stat--dark { background: var(--navy); box-shadow: inset 0 3px 0 var(--blue); }
+.aosco-stat--dark .aosco-stat-label { color: #c9d3e4; }
+.aosco-stat--dark .aosco-stat-value { color: #fff; }
+
+.aosco-prepared { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-top: 56px; }
+.aosco-mini-label { color: var(--muted); font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }
+.aosco-prepared-name { margin-top: 4px !important; color: var(--navy); font-size: 16px; font-weight: 700; }
+.aosco-prepared-org { color: var(--muted); }
+.aosco-ref { margin-top: 28px !important; color: var(--muted); font-size: 13px; }
+
+/* Inner page header / footer */
+.aosco-page-head { display: flex; align-items: flex-end; justify-content: space-between; padding-bottom: 8px; border-bottom: 1px solid var(--line); }
+.aosco-page-head img { height: 40px; display: block; }
+.aosco-page-head-ref { color: var(--muted); font-size: 12px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
+.aosco-page-foot { display: flex; justify-content: space-between; margin-top: 40px; padding-top: 8px; border-top: 1px solid var(--line); color: var(--muted); font-size: 11px; }
+.aosco-page-foot strong { color: var(--ink); font-size: 14px; font-weight: 400; }
+
+/* Section headings */
+.aosco-h2 { display: flex; gap: 12px; margin: 26px 0 14px; padding-bottom: 6px; border-bottom: 3px solid var(--navy); color: var(--navy); font-size: 18px; font-weight: 800; letter-spacing: 0.02em; text-transform: uppercase; }
+.aosco-h2-num { color: var(--blue); }
+.aosco-h3 { margin: 22px 0 10px !important; color: var(--navy); font-size: 14px; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; }
+.aosco-greeting { margin-bottom: 12px !important; }
+.aosco-intro { margin-bottom: 20px !important; }
+
+/* Detail cards */
+.aosco-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 20px 24px; align-items: start; }
+.aosco-card { width: 100%; border-collapse: collapse; }
+.aosco-card th { background: var(--navy); color: #fff; padding: 8px 12px; border: 1px solid var(--navy); text-align: left; font-size: 13px; letter-spacing: 0.04em; text-transform: uppercase; }
+.aosco-card td { padding: 7px 12px; border: 1px solid var(--line); vertical-align: middle; }
+.aosco-card-k { width: 36%; background: var(--panel); color: var(--muted); font-weight: 700; }
+.aosco-card--wide .aosco-card-k { width: 26%; }
+
+/* Investment at a glance */
+.aosco-glance { display: grid; grid-template-columns: repeat(4, 1fr); gap: 2px; border-top: 3px solid var(--navy); }
+.aosco-glance-tile { background: var(--panel); padding: 14px 14px 16px; }
+.aosco-glance-label { color: var(--muted); font-size: 11px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; }
+.aosco-glance-value { margin-top: 4px; color: var(--navy); font-size: 18px; font-weight: 700; }
+.aosco-glance-tile--dark { background: var(--navy); box-shadow: inset 0 3px 0 var(--blue); }
+.aosco-glance-tile--dark .aosco-glance-label { color: #c9d3e4; }
+.aosco-glance-tile--dark .aosco-glance-value { color: #fff; }
+.aosco-glance-tile--gold { background: var(--cream); }
+.aosco-glance-tile--gold .aosco-glance-value { color: var(--gold-ink); }
+.aosco-note { margin-top: 10px !important; color: var(--muted); font-size: 12px; font-style: italic; }
+
+/* Schedule grid */
+.aosco-legend { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 28px; margin-bottom: 8px; font-size: 12px; }
+.aosco-legend-item { display: inline-flex; align-items: center; gap: 8px; }
+.aosco-swatch { display: inline-block; width: 34px; height: 14px; }
+.aosco-swatch--paid { background: var(--blue); }
+.aosco-swatch--gtd { background: var(--gold); }
+.aosco-legend-meta { color: var(--muted); font-size: 11px; }
+
+.aosco-grid { width: 100%; table-layout: fixed; border-collapse: collapse; font-size: 10px; line-height: 1.25; }
+.aosco-grid--dense { font-size: 8px; }
+.aosco-grid th, .aosco-grid td { border: 1px solid #e1e5ec; padding: 5px 3px; text-align: center; vertical-align: middle; overflow: hidden; }
+.aosco-grid-band { background: var(--navy); color: #fff; font-size: 1.15em; font-weight: 700; letter-spacing: 0.02em; border-color: #fff !important; }
+.aosco-grid-band--alt { background: #3a5a8c; }
+.aosco-grid-sub { background: var(--panel-2); color: var(--navy); font-weight: 700; }
+.aosco-grid-date { background: var(--panel-2); color: var(--muted); font-weight: 400; }
+.aosco-grid .aosco-left { text-align: left; padding-left: 6px; }
+.aosco-grid-site { font-weight: 700; color: var(--navy); }
+.aosco-spot-paid { color: var(--blue); font-weight: 700; }
+.aosco-spot-bonus { color: var(--gold-ink); font-weight: 700; }
+.aosco-cell-paid { background: var(--blue); color: #fff; font-weight: 700; }
+.aosco-cell-gtd { background: var(--gold); color: var(--navy); font-weight: 700; }
+.aosco-grid-total td { background: var(--navy); color: #fff; font-weight: 700; border-color: #fff; }
+
+/* Data tables (placements, investment summary, billing) */
+.aosco-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.aosco-table th { background: var(--navy); color: #fff; padding: 8px 10px; border: 1px solid var(--navy); text-align: left; font-weight: 700; vertical-align: middle; }
+.aosco-table td { padding: 8px 10px; border: 1px solid var(--line); vertical-align: middle; }
+.aosco-table .num { text-align: right; }
+.aosco-table .mid { text-align: center; }
+.aosco-table .strong { font-weight: 700; color: var(--navy); }
+.aosco-table-total td { background: var(--panel-2); font-weight: 700; color: var(--navy); }
+.aosco-table-bonus { color: var(--gold-ink); }
+.aosco-table-small { color: var(--muted); font-size: 11px; }
+.aosco-gap { margin-top: 28px; }
+.aosco-accounts { margin-bottom: 10px !important; }
+
+/* Special conditions */
+.aosco-sc { margin: 0; padding-left: 22px; }
+.aosco-sc li { margin-bottom: 6px; padding-left: 4px; }
+.aosco-sc li::marker { color: var(--blue); font-weight: 700; }
+
+/* Execution */
+.aosco-exec { display: grid; grid-template-columns: 1fr 1fr; gap: 36px; margin-top: 18px; }
+.aosco-exec-eyebrow { color: var(--blue); font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }
+.aosco-exec-entity { margin-top: 2px !important; color: var(--navy); font-size: 15px; font-weight: 700; }
+.aosco-exec-by { color: var(--muted); }
+.aosco-sign { margin-top: 14px; }
+.aosco-sign-value { min-height: 24px; padding: 2px 0 4px; border-bottom: 1px solid #9aa3b2; }
+
+@media (max-width: 640px) {
+  .aosco-sheet { padding: 24px 16px; }
+  .aosco-stats, .aosco-glance { grid-template-columns: 1fr 1fr; }
+  .aosco-cols, .aosco-prepared, .aosco-exec { grid-template-columns: 1fr; }
+  .aosco-hero { height: 240px; }
+  .aosco-grid-scroll { overflow-x: auto; }
+  .aosco-grid { min-width: 720px; }
+}
+
+@media print {
+  @page { size: A4; margin: 10mm; }
+  @page aosco-landscape { size: A4 landscape; margin: 8mm; }
+  .aosco-root { max-width: none; }
+  .aosco-sheet { padding: 0; break-after: page; page-break-after: always; }
+  .aosco-sheet + .aosco-sheet { border-top: 0; }
+  .aosco-sheet--landscape { page: aosco-landscape; }
+  .aosco-hero { height: 400px; }
+  tr, .aosco-stats, .aosco-glance, .aosco-exec > div { break-inside: avoid; page-break-inside: avoid; }
+}

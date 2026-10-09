@@ -1,0 +1,23 @@
+.aosco-terms-root { max-width: 64rem; margin: 0 auto; color: #111827; font-family: Arial, sans-serif; }
+.aosco-terms-heading { font-size: 1rem; font-weight: 700; text-transform: uppercase; letter-spacing: -0.02em; color: #111827; margin: 0 0 1rem; }
+.aosco-terms-list { margin: 0; padding-left: 1.25rem; font-size: 13px; line-height: 1.4; color: #111827; column-gap: 2.5rem; }
+@media (min-width: 768px) {
+  .aosco-terms-list { column-count: 2; }
+}
+.aosco-terms-item { break-inside: avoid-column; margin-bottom: 1rem; }
+.aosco-terms-item-title { font-weight: 600; }
+.aosco-terms-item-body { margin: 0.25rem 0 0; color: #1f2937; }
+.aosco-terms-defs { margin: 0.375rem 0 0; }
+.aosco-terms-defs > div { margin-bottom: 0.375rem; }
+.aosco-terms-def-term { font-weight: 600; }
+.aosco-terms-def-text { color: #1f2937; }
+.aosco-nested-list { list-style-type: lower-alpha; margin: 0.375rem 0 0; padding-left: 1.25rem; }
+.aosco-nested-list--roman { list-style-type: lower-roman; }
+.aosco-nested-list li { margin-bottom: 0.375rem; }
+
+@media print {
+  @page {
+    size: A4;
+    margin: 8mm;
+  }
+}
